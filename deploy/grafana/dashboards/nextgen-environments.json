@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -21,25 +24,41 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "panels": [],
       "title": "Umgebungen live",
       "type": "row"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
       "description": "Aktuell laufende Version (gitSha) auf Integration — live via /api/info.",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
           "mappings": [],
           "noValue": "OFFLINE",
           "unit": "string"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 5
+      },
       "id": 2,
       "options": {
         "colorMode": "background",
@@ -47,7 +66,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^gitSha$/", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^version$/",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "value_and_name",
         "wideLayout": true
@@ -56,12 +81,31 @@
       "targets": [
         {
           "columns": [
-            { "selector": "environment", "text": "env", "type": "string" },
-            { "selector": "gitSha", "text": "gitSha", "type": "string" },
-            { "selector": "version", "text": "version", "type": "string" },
-            { "selector": "demoBug", "text": "demoBug", "type": "string" }
+            {
+              "selector": "environment",
+              "text": "env",
+              "type": "string"
+            },
+            {
+              "selector": "gitSha",
+              "text": "gitSha",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "version",
+              "type": "string"
+            },
+            {
+              "selector": "demoBug",
+              "text": "demoBug",
+              "type": "string"
+            }
           ],
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
           "filters": [],
           "format": "table",
           "global_query_id": "",
@@ -71,26 +115,49 @@
           "source": "url",
           "type": "json",
           "url": "http://host.docker.internal:3001/api/info",
-          "url_options": { "data": "", "method": "GET" }
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
         }
       ],
       "title": "INT — laufende Version",
       "type": "stat"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
       "description": "Health von Integration — live via /api/health.",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "red", "mode": "fixed" },
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
           "mappings": [
-            { "options": { "ok": { "color": "green", "index": 0, "text": "GRÜN" } }, "type": "value" }
+            {
+              "options": {
+                "ok": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "GRÜN"
+                }
+              },
+              "type": "value"
+            }
           ],
           "noValue": "OFFLINE"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 2, "x": 6, "y": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 3
+      },
       "id": 3,
       "options": {
         "colorMode": "background",
@@ -98,7 +165,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^status$/", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^status$/",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "value",
         "wideLayout": true
@@ -106,8 +179,17 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "columns": [{ "selector": "status", "text": "status", "type": "string" }],
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "columns": [
+            {
+              "selector": "status",
+              "text": "status",
+              "type": "string"
+            }
+          ],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
           "filters": [],
           "format": "table",
           "global_query_id": "",
@@ -117,25 +199,39 @@
           "source": "url",
           "type": "json",
           "url": "http://host.docker.internal:3001/api/health",
-          "url_options": { "data": "", "method": "GET" }
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
         }
       ],
       "title": "INT",
       "type": "stat"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
       "description": "Aktuell laufende Version (gitSha) auf Abnahme — live via /api/info.",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "orange", "mode": "fixed" },
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          },
           "mappings": [],
           "noValue": "OFFLINE",
           "unit": "string"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 6, "x": 8, "y": 1 },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 5
+      },
       "id": 4,
       "options": {
         "colorMode": "background",
@@ -143,7 +239,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^gitSha$/", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^version$/",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "value_and_name",
         "wideLayout": true
@@ -152,12 +254,31 @@
       "targets": [
         {
           "columns": [
-            { "selector": "environment", "text": "env", "type": "string" },
-            { "selector": "gitSha", "text": "gitSha", "type": "string" },
-            { "selector": "version", "text": "version", "type": "string" },
-            { "selector": "demoBug", "text": "demoBug", "type": "string" }
+            {
+              "selector": "environment",
+              "text": "env",
+              "type": "string"
+            },
+            {
+              "selector": "gitSha",
+              "text": "gitSha",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "version",
+              "type": "string"
+            },
+            {
+              "selector": "demoBug",
+              "text": "demoBug",
+              "type": "string"
+            }
           ],
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
           "filters": [],
           "format": "table",
           "global_query_id": "",
@@ -167,26 +288,49 @@
           "source": "url",
           "type": "json",
           "url": "http://host.docker.internal:3002/api/info",
-          "url_options": { "data": "", "method": "GET" }
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
         }
       ],
       "title": "ABNAHME — laufende Version",
       "type": "stat"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
       "description": "Health von Abnahme — live via /api/health.",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "red", "mode": "fixed" },
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
           "mappings": [
-            { "options": { "ok": { "color": "green", "index": 0, "text": "GRÜN" } }, "type": "value" }
+            {
+              "options": {
+                "ok": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "GRÜN"
+                }
+              },
+              "type": "value"
+            }
           ],
           "noValue": "OFFLINE"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 2, "x": 14, "y": 1 },
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 3
+      },
       "id": 5,
       "options": {
         "colorMode": "background",
@@ -194,7 +338,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^status$/", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^status$/",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "value",
         "wideLayout": true
@@ -202,8 +352,17 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "columns": [{ "selector": "status", "text": "status", "type": "string" }],
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "columns": [
+            {
+              "selector": "status",
+              "text": "status",
+              "type": "string"
+            }
+          ],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
           "filters": [],
           "format": "table",
           "global_query_id": "",
@@ -213,25 +372,39 @@
           "source": "url",
           "type": "json",
           "url": "http://host.docker.internal:3002/api/health",
-          "url_options": { "data": "", "method": "GET" }
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
         }
       ],
       "title": "ABNAHME",
       "type": "stat"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
       "description": "Aktuell laufende Version (gitSha) auf PROD — live via /api/info.",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "green", "mode": "fixed" },
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
           "mappings": [],
           "noValue": "OFFLINE",
           "unit": "string"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 6, "x": 16, "y": 1 },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 5
+      },
       "id": 6,
       "options": {
         "colorMode": "background",
@@ -239,7 +412,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^gitSha$/", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^version$/",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "value_and_name",
         "wideLayout": true
@@ -248,12 +427,31 @@
       "targets": [
         {
           "columns": [
-            { "selector": "environment", "text": "env", "type": "string" },
-            { "selector": "gitSha", "text": "gitSha", "type": "string" },
-            { "selector": "version", "text": "version", "type": "string" },
-            { "selector": "demoBug", "text": "demoBug", "type": "string" }
+            {
+              "selector": "environment",
+              "text": "env",
+              "type": "string"
+            },
+            {
+              "selector": "gitSha",
+              "text": "gitSha",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "version",
+              "type": "string"
+            },
+            {
+              "selector": "demoBug",
+              "text": "demoBug",
+              "type": "string"
+            }
           ],
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
           "filters": [],
           "format": "table",
           "global_query_id": "",
@@ -263,26 +461,49 @@
           "source": "url",
           "type": "json",
           "url": "http://host.docker.internal:3003/api/info",
-          "url_options": { "data": "", "method": "GET" }
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
         }
       ],
       "title": "PROD — laufende Version",
       "type": "stat"
     },
     {
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
       "description": "Health von PROD — live via /api/health.",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "red", "mode": "fixed" },
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
           "mappings": [
-            { "options": { "ok": { "color": "green", "index": 0, "text": "GRÜN" } }, "type": "value" }
+            {
+              "options": {
+                "ok": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "GRÜN"
+                }
+              },
+              "type": "value"
+            }
           ],
           "noValue": "OFFLINE"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 2, "x": 22, "y": 1 },
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 3
+      },
       "id": 7,
       "options": {
         "colorMode": "background",
@@ -290,7 +511,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^status$/", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^status$/",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "value",
         "wideLayout": true
@@ -298,8 +525,17 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "columns": [{ "selector": "status", "text": "status", "type": "string" }],
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "infinity" },
+          "columns": [
+            {
+              "selector": "status",
+              "text": "status",
+              "type": "string"
+            }
+          ],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
           "filters": [],
           "format": "table",
           "global_query_id": "",
@@ -309,7 +545,10 @@
           "source": "url",
           "type": "json",
           "url": "http://host.docker.internal:3003/api/health",
-          "url_options": { "data": "", "method": "GET" }
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
         }
       ],
       "title": "PROD",
@@ -317,37 +556,66 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
       "id": 8,
       "panels": [],
       "title": "Deployment-Historie",
       "type": "row"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Wer hat wann welche Version wohin deployed — Rollbacks rot markiert.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
           "mappings": []
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Status" },
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
             "properties": [
               {
                 "id": "mappings",
                 "value": [
                   {
                     "options": {
-                      "deployed": { "color": "blue", "index": 0, "text": "Deployed" },
-                      "failed": { "color": "dark-red", "index": 3, "text": "Fehlgeschlagen" },
-                      "promoted": { "color": "green", "index": 1, "text": "Promoted" },
-                      "rolled_back": { "color": "red", "index": 2, "text": "Rollback" }
+                      "deployed": {
+                        "color": "blue",
+                        "index": 0,
+                        "text": "Deployed"
+                      },
+                      "failed": {
+                        "color": "dark-red",
+                        "index": 3,
+                        "text": "Fehlgeschlagen"
+                      },
+                      "promoted": {
+                        "color": "green",
+                        "index": 1,
+                        "text": "Promoted"
+                      },
+                      "rolled_back": {
+                        "color": "red",
+                        "index": 2,
+                        "text": "Rollback"
+                      }
                     },
                     "type": "value"
                   }
@@ -355,12 +623,18 @@
               },
               {
                 "id": "custom.cellOptions",
-                "value": { "mode": "basic", "type": "color-background" }
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
               }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Run" },
+            "matcher": {
+              "id": "byName",
+              "options": "Run"
+            },
             "properties": [
               {
                 "id": "links",
@@ -375,23 +649,46 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Zeit" },
-            "properties": [{ "id": "unit", "value": "dateTimeAsLocal" }]
+            "matcher": {
+              "id": "byName",
+              "options": "Zeit"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 8 },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
       "id": 9,
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
         "sortBy": []
       },
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -404,18 +701,28 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
       "id": 10,
       "panels": [],
       "title": "Quality Gates",
       "type": "row"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Gate-Ergebnisse pro Lauf (INT & Abnahme): bestanden / fehlgeschlagen / flaky — gestapelt.",
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -426,16 +733,27 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "auto",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "min": 0,
@@ -443,38 +761,90 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "passed" },
+            "matcher": {
+              "id": "byName",
+              "options": "passed"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-              { "id": "displayName", "value": "Bestanden" }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Bestanden"
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "failed" },
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-              { "id": "displayName", "value": "Fehlgeschlagen" }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Fehlgeschlagen"
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "flaky" },
+            "matcher": {
+              "id": "byName",
+              "options": "flaky"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
-              { "id": "displayName", "value": "Flaky" }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Flaky"
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
       "id": 11,
       "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
@@ -486,24 +856,40 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Summe flaky markierter Tests der letzten 7 Tage. 0 = grün, alles darüber gelb.",
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
             ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 18 },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 12,
+        "y": 18
+      },
       "id": 12,
       "options": {
         "colorMode": "value",
@@ -511,7 +897,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "auto",
         "wideLayout": true
@@ -519,7 +911,10 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -531,24 +926,40 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Rollback-Ereignisse der letzten 7 Tage. 0 = grün, alles darüber rot.",
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 18 },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 16,
+        "y": 18
+      },
       "id": 13,
       "options": {
         "colorMode": "value",
@@ -556,7 +967,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "auto",
         "wideLayout": true
@@ -564,7 +981,10 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -576,21 +996,36 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Dauer des zuletzt gemessenen Gate-/Deployment-Laufs in Sekunden.",
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "blue", "value": null }]
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
           },
           "unit": "s"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 18 },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 18
+      },
       "id": 14,
       "options": {
         "colorMode": "value",
@@ -598,7 +1033,13 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "showPercentChange": false,
         "textMode": "auto",
         "wideLayout": true
@@ -606,7 +1047,10 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -619,21 +1063,35 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
       "id": 15,
       "panels": [],
       "title": "Stabilität — stündliche Checks",
       "type": "row"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Stündlicher Stabilitäts-Check je Umgebung (Synthetic Monitoring): grün = alles bestanden, gelb = flaky, rot = mindestens ein Fehler. Je ein Band für INT / Abnahme / PROD.",
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "fillOpacity": 80,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "insertNulls": false,
             "lineWidth": 0,
             "spanNulls": false
@@ -641,9 +1099,21 @@
           "mappings": [
             {
               "options": {
-                "0": { "color": "green", "index": 0, "text": "grün" },
-                "1": { "color": "yellow", "index": 1, "text": "flaky" },
-                "2": { "color": "red", "index": 2, "text": "rot" }
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "grün"
+                },
+                "1": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "flaky"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "rot"
+                }
               },
               "type": "value"
             }
@@ -651,28 +1121,52 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 2 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
             ]
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 27 },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
       "id": 16,
       "options": {
         "alignValue": "center",
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
         "mergeValues": true,
         "rowHeight": 0.9,
         "showValue": "auto",
-        "tooltip": { "mode": "single", "sort": "none" }
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
@@ -684,46 +1178,81 @@
       "type": "state-timeline"
     },
     {
-      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "ops-postgres"
+      },
       "description": "Der jeweils jüngste Stabilitäts-Check je Umgebung mit Direktlink zum Playwright-Report.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
           "mappings": []
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Zeit" },
-            "properties": [{ "id": "unit", "value": "dateTimeAsLocal" }]
+            "matcher": {
+              "id": "byName",
+              "options": "Zeit"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Fehler" },
+            "matcher": {
+              "id": "byName",
+              "options": "Fehler"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "thresholds" } },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
               {
                 "id": "thresholds",
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    { "color": "text", "value": null },
-                    { "color": "red", "value": 1 }
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
                   ]
                 }
               },
               {
                 "id": "custom.cellOptions",
-                "value": { "type": "color-text" }
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "report_url" },
+            "matcher": {
+              "id": "byName",
+              "options": "report_url"
+            },
             "properties": [
-              { "id": "displayName", "value": "Report" },
+              {
+                "id": "displayName",
+                "value": "Report"
+              },
               {
                 "id": "links",
                 "value": [
@@ -738,18 +1267,33 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
       "id": 17,
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
         "sortBy": []
       },
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "datasource": {
+            "type": "postgres",
+            "uid": "ops-postgres"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -764,9 +1308,17 @@
   "preload": false,
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["nextgen", "cicd"],
-  "templating": { "list": [] },
-  "time": { "from": "now-6h", "to": "now" },
+  "tags": [
+    "nextgen",
+    "cicd"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "NextGen CICD — Environments",
