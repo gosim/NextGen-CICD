@@ -32,13 +32,14 @@ jobs:
       cancel-in-progress: false
     environment:
       name: ${{ (inputs.environment == 'int' && 'integration') || inputs.environment }}
-    env:
-      # Keychain-freie Docker-Config — siehe _deploy.yml
-      DOCKER_CONFIG: ${{ runner.temp }}/docker-config
     steps:
       - uses: actions/checkout@v4
+      # Keychain-freie Docker-Config — siehe _deploy.yml
       - name: GHCR-Login (Keychain-frei)
         run: |
+          DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
+          echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
+          export DOCKER_CONFIG
           mkdir -p "$DOCKER_CONFIG"
           printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
