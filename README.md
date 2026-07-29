@@ -91,7 +91,7 @@ DB-Zugang je Umgebung: User/DB `app`, Passwort im jeweiligen [deploy/env/*.env](
 | Grafana (anonymer Viewer) | http://localhost:8000 |
 | Haupt-Dashboard „NextGen CICD — Environments" | http://localhost:8000/d/nextgen-environments/ |
 | Editier-Login | `admin` / `admin` |
-| Portainer (Container-GUI, alle Stacks/Logs/Konsolen) | http://localhost:9000 — beim ersten Aufruf Admin-Passwort setzen |
+| Portainer (Container-GUI, alle Stacks/Logs/Konsolen) | http://localhost:9000 — Erst-Setup verlangt den **Setup-Token** aus `docker logs nextgen-ops-portainer` (Zeile `setup_token=…`; Portainer ≥ 2.39) und muss binnen 5 min abgeschlossen sein, sonst Container neu starten |
 
 ### GitHub
 
