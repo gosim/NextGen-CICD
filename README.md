@@ -38,7 +38,16 @@ deploy/scripts/dev.sh pnpm test
 
 ### Lokale Stacks starten
 
-Jede Umgebung ist ein eigenes Compose-Projekt mit eigenem env-File. `deploy.sh` kapselt Pull, Migrations-One-Shot und Healthcheck-Wait (IMAGE_TAG ist Pflicht — die Pipeline setzt ihn auf den Commit-Tag, lokal tut es jeder gebaute Tag):
+**Alles mit einem Befehl** (inklusive Docker Desktop selbst — starten, stoppen, Status):
+
+```bash
+deploy/scripts/stacks.sh up      # Docker Desktop (falls aus) + Ops-Stack + alle Umgebungen (letzter Stand)
+deploy/scripts/stacks.sh stop    # alles anhalten + Docker Desktop beenden (--keep-docker: Docker anlassen)
+deploy/scripts/stacks.sh status  # Version, Health und Container je Stack
+deploy/scripts/stacks.sh down    # Container entfernen (Volumes/Daten bleiben)
+```
+
+Einzelne Umgebung gezielt deployen: Jede Umgebung ist ein eigenes Compose-Projekt mit eigenem env-File. `deploy.sh` kapselt Pull, Migrations-One-Shot, Rolling-Update und Healthcheck-Wait (IMAGE_TAG ist Pflicht — die Pipeline setzt ihn auf den Commit-Tag, lokal tut es jeder gebaute Tag):
 
 ```bash
 IMAGE_TAG=sha-local deploy/scripts/deploy.sh int

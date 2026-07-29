@@ -14,11 +14,9 @@ docker info --format 'OK {{.ServerVersion}}'
 gh api repos/gosim/NextGen-CICD/actions/runners \
   --jq '.runners[] | .name + " → " + .status'
 
-# Alle vier Stacks hochfahren (falls nicht schon laufend)
-IMAGE_TAG=$(deploy/scripts/state.sh get int last_green) deploy/scripts/deploy.sh int
-IMAGE_TAG=$(deploy/scripts/state.sh get abnahme last_green) deploy/scripts/deploy.sh abnahme
-IMAGE_TAG=$(deploy/scripts/state.sh get prod last_green) deploy/scripts/deploy.sh prod
-docker compose -p nextgen-ops -f deploy/compose/docker-compose.ops.yml up -d
+# Alles mit einem Befehl hochfahren (inkl. Docker Desktop, falls aus)
+deploy/scripts/stacks.sh up
+deploy/scripts/stacks.sh status   # Kontrolle: 4× ✅
 
 # Gesundheitscheck aller Umgebungen
 for p in 3001 3002 3003; do curl -fsS "http://localhost:$p/api/info" \
