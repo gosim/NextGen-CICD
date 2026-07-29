@@ -132,6 +132,21 @@ Diese Datei liegt außerhalb des Runner-`_work`-Verzeichnisses und übersteht da
 
 Die zweite Ebene ist reine **Sichtbarkeit**: Jeder `deploy`-Job erzeugt über die GitHub-Deployments-API einen Eintrag (`in_progress` → `success`/`failure`), sichtbar auf der Repo-Seite „Environments". Dort sieht man live, welcher Commit gerade auf welcher Umgebung läuft — der Demo-Effekt, der in Akt 1 des Runbooks genutzt wird, um alle drei Umgebungen synchron auf derselben Version zu zeigen.
 
+## Artefakt-Ablagen: Wo Versionen und Backups liegen
+
+Das Wiederherstellungs-Konzept verteilt sich auf **vier Ablageorte mit klaren Rollen** — Leitprinzip: *Deploy-Artefakte ins Registry (unveränderlich, versioniert), Betriebszustand und Daten-Backups lokal beim Deploy-Ziel (rollback-schnell, netzunabhängig), Analyse-Artefakte am CI-Lauf.*
+
+| Ablage | Ort | Inhalt & Rolle |
+|---|---|---|
+| **Artifact-Repository (GHCR)** | `ghcr.io/gosim/nextgen-cicd/{backend,frontend,e2e}:sha-<commit>` | Jede jemals gebaute App-Version als unveränderliches Docker-Image („build once"). Tags werden nie überschrieben; jede Version ist per SHA eindeutig einem Commit zuordenbar und jederzeit erneut deploybar |
+| **Lokaler Image-Cache + `green-<env>`-Pins** | Docker-Cache des Runner-Hosts | Der Promote-Schritt taggt die zuletzt grüne Version zusätzlich lokal als `green-int\|abnahme\|prod`. Doppelte Absicherung: Rollback funktioniert auch ohne Registry-Zugriff, und `docker prune` kann das Rollback-Ziel nicht wegräumen |
+| **DB-Dumps** | `~/deployments/backups/<env>/<zeitstempel>_<version>.dump` | `pg_dump -Fc` vor **jedem** Deployment (im 🚀-Deploy-Job, nach der Approval-Freigabe — also maximal frisch), Retention: letzte 10 pro Umgebung. Bewusst lokal statt remote: Beim Rollback zählt Sekunden-schneller Zugriff ohne Netzabhängigkeit, und Datenbank-Inhalte gehören nicht in eine Registry |
+| **GitHub Actions Artifacts** | am jeweiligen Workflow-Run (14 Tage) | Playwright-HTML-Report, Traces, Videos, Screenshots jedes Gate-Laufs — die Analyse-Artefakte für den Trace-Viewer, nicht fürs Deployment |
+
+Der Rollback bedient sich daraus in dieser Reihenfolge: `state.sh` liefert `last_green` + `last_backup` → `restore.sh` spielt den Dump ein → `deploy.sh` startet die `last_green`-Version (Image aus lokalem Cache, Fallback GHCR).
+
+**Ausbaustufe für den Enterprise-Einsatz:** DB-Dumps zusätzlich in einen Objektspeicher (S3, Azure Blob o. ä.) replizieren, damit Backups auch einen Totalausfall des Deploy-Hosts überleben; für Images ggf. eine Registry mit Retention-Policies und Signierung (cosign). Für die Demo bewusst schlank gehalten.
+
 ## Rollback-Mechanik
 
 Schlägt das Gate fehl, übernimmt der `rollback`-Job in `_deploy.yml` (identischer Ablauf in `rollback-manual.yml` für den manuellen Notfallhebel). Die Reihenfolge ist kritisch — jeder Schritt existiert, weil der vorherige ihn erzwingt:
