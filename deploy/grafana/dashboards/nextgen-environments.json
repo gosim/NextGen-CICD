@@ -47,7 +47,108 @@
             "mode": "fixed",
             "fixedColor": "blue"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*0$",
+                "result": {
+                  "color": "blue",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*1$",
+                "result": {
+                  "color": "purple",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*2$",
+                "result": {
+                  "color": "orange",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*3$",
+                "result": {
+                  "color": "dark-yellow",
+                  "index": 3
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*4$",
+                "result": {
+                  "color": "dark-blue",
+                  "index": 4
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*5$",
+                "result": {
+                  "color": "semi-dark-purple",
+                  "index": 5
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*6$",
+                "result": {
+                  "color": "semi-dark-orange",
+                  "index": 6
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*7$",
+                "result": {
+                  "color": "light-blue",
+                  "index": 7
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*8$",
+                "result": {
+                  "color": "light-purple",
+                  "index": 8
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*9$",
+                "result": {
+                  "color": "dark-orange",
+                  "index": 9
+                }
+              }
+            }
+          ],
           "noValue": "OFFLINE",
           "unit": "string"
         },
@@ -220,7 +321,108 @@
             "mode": "fixed",
             "fixedColor": "blue"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*0$",
+                "result": {
+                  "color": "blue",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*1$",
+                "result": {
+                  "color": "purple",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*2$",
+                "result": {
+                  "color": "orange",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*3$",
+                "result": {
+                  "color": "dark-yellow",
+                  "index": 3
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*4$",
+                "result": {
+                  "color": "dark-blue",
+                  "index": 4
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*5$",
+                "result": {
+                  "color": "semi-dark-purple",
+                  "index": 5
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*6$",
+                "result": {
+                  "color": "semi-dark-orange",
+                  "index": 6
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*7$",
+                "result": {
+                  "color": "light-blue",
+                  "index": 7
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*8$",
+                "result": {
+                  "color": "light-purple",
+                  "index": 8
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*9$",
+                "result": {
+                  "color": "dark-orange",
+                  "index": 9
+                }
+              }
+            }
+          ],
           "noValue": "OFFLINE",
           "unit": "string"
         },
@@ -393,7 +595,108 @@
             "mode": "fixed",
             "fixedColor": "blue"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*0$",
+                "result": {
+                  "color": "blue",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*1$",
+                "result": {
+                  "color": "purple",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*2$",
+                "result": {
+                  "color": "orange",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*3$",
+                "result": {
+                  "color": "dark-yellow",
+                  "index": 3
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*4$",
+                "result": {
+                  "color": "dark-blue",
+                  "index": 4
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*5$",
+                "result": {
+                  "color": "semi-dark-purple",
+                  "index": 5
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*6$",
+                "result": {
+                  "color": "semi-dark-orange",
+                  "index": 6
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*7$",
+                "result": {
+                  "color": "light-blue",
+                  "index": 7
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*8$",
+                "result": {
+                  "color": "light-purple",
+                  "index": 8
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": ".*9$",
+                "result": {
+                  "color": "dark-orange",
+                  "index": 9
+                }
+              }
+            }
+          ],
           "noValue": "OFFLINE",
           "unit": "string"
         },
@@ -657,6 +960,125 @@
               {
                 "id": "unit",
                 "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Version"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*0$",
+                      "result": {
+                        "color": "blue",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*1$",
+                      "result": {
+                        "color": "purple",
+                        "index": 1
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*2$",
+                      "result": {
+                        "color": "orange",
+                        "index": 2
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*3$",
+                      "result": {
+                        "color": "dark-yellow",
+                        "index": 3
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*4$",
+                      "result": {
+                        "color": "dark-blue",
+                        "index": 4
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*5$",
+                      "result": {
+                        "color": "semi-dark-purple",
+                        "index": 5
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*6$",
+                      "result": {
+                        "color": "semi-dark-orange",
+                        "index": 6
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*7$",
+                      "result": {
+                        "color": "light-blue",
+                        "index": 7
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*8$",
+                      "result": {
+                        "color": "light-purple",
+                        "index": 8
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*9$",
+                      "result": {
+                        "color": "dark-orange",
+                        "index": 9
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           }
@@ -1262,6 +1684,125 @@
                     "url": "${__data.fields.report_url}"
                   }
                 ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Version"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*0$",
+                      "result": {
+                        "color": "blue",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*1$",
+                      "result": {
+                        "color": "purple",
+                        "index": 1
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*2$",
+                      "result": {
+                        "color": "orange",
+                        "index": 2
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*3$",
+                      "result": {
+                        "color": "dark-yellow",
+                        "index": 3
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*4$",
+                      "result": {
+                        "color": "dark-blue",
+                        "index": 4
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*5$",
+                      "result": {
+                        "color": "semi-dark-purple",
+                        "index": 5
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*6$",
+                      "result": {
+                        "color": "semi-dark-orange",
+                        "index": 6
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*7$",
+                      "result": {
+                        "color": "light-blue",
+                        "index": 7
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*8$",
+                      "result": {
+                        "color": "light-purple",
+                        "index": 8
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*9$",
+                      "result": {
+                        "color": "dark-orange",
+                        "index": 9
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           }
