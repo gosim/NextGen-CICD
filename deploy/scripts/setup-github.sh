@@ -51,6 +51,13 @@ if [ "${1:-}" = "runner" ]; then
     REG_TOKEN="$(gh api --method POST "repos/$REPO/actions/runners/registration-token" --jq .token)"
     ./config.sh --url "https://github.com/$REPO" --token "$REG_TOKEN" \
       --name "nextgen-mac" --labels deploy --unattended
+    # Minimaler PATH für Runner-Jobs: OHNE die docker-credential-* Helper.
+    # Sonst erzwingt Docker den macOS-Keychain, der im LaunchAgent-Kontext
+    # nicht zugreifbar ist ("User interaction is not allowed"). Die Workflows
+    # nutzen stattdessen ein eigenes DOCKER_CONFIG mit Klartext-Auth (Job-Token).
+    mkdir -p "$HOME/deployments/runnerbin"
+    ln -sf /Applications/Docker.app/Contents/Resources/bin/docker "$HOME/deployments/runnerbin/docker"
+    echo "$HOME/deployments/runnerbin:/usr/bin:/bin:/usr/sbin:/sbin" > .path
     ./svc.sh install
     ./svc.sh start
     echo "✅ Runner 'nextgen-mac' läuft als Dienst (Labels: self-hosted, macOS, ARM64, deploy)."
