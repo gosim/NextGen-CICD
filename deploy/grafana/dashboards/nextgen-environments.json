@@ -902,7 +902,7 @@
                       "deployed": {
                         "color": "blue",
                         "index": 0,
-                        "text": "Deployed"
+                        "text": "Ausgerollt"
                       },
                       "failed": {
                         "color": "dark-red",
@@ -912,12 +912,12 @@
                       "promoted": {
                         "color": "green",
                         "index": 1,
-                        "text": "Promoted"
+                        "text": "Gate bestanden"
                       },
                       "rolled_back": {
                         "color": "red",
                         "index": 2,
-                        "text": "Rollback"
+                        "text": "Zurückgerollt"
                       }
                     },
                     "type": "value"
