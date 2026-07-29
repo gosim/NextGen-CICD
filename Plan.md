@@ -197,16 +197,16 @@ Environments `integration` (keine Reviewer) / `abnahme` / `prod` (Required Revie
 - [x] `ops-event.sh` + Pipeline-Integration: Events aus deploy/promote/rollback + Testergebnisse (inkl. flaky-Zahl) fail-safe einspeisen
 
 ### Phase 8 — GitHub- & Runner-Setup
-- [ ] Environments + Protection Rules + Variables/Secrets via `gh api` anlegen
-- [ ] Self-hosted Runner installieren (`~/actions-runner`, Labels `self-hosted,macOS,deploy`, als LaunchAgent-Dienst), Actions-Sicherheitseinstellungen
-- [ ] Branch Protection `main`
+- [x] Environments + Protection Rules + Variables/Secrets via `gh api` anlegen
+- [x] Self-hosted Runner installieren (`~/actions-runner`, Labels `self-hosted,macOS,deploy`, als LaunchAgent-Dienst), Actions-Sicherheitseinstellungen
+- [x] Branch Protection `main`
 
 ### Phase 9 — Doku & Präsentation
 - [x] `docs/architecture.md` (Architektur- + Pipeline-Flow als Mermaid), `docs/testkonzept.md` (Pyramide, Flaky-/Quarantäne-Prozess), `docs/demo-runbook.md` (Drehbuch in 4 Akten: Normalzustand grün → Bad Commit → Gate rot → Trace-Viewer → Auto-Rollback → Flaky-Demo → Quarantäne; Grafana als durchgehender Beamer-Anker)
 - [x] README neu schreiben (Projektüberblick, Quickstart, Badges, Environments-Link)
 
 ### Phase 10 — Verifikation & Qualitäts-Pass
-- [ ] Siehe Verifikation unten; danach Multi-Agent-Code-Review (adversarial verify) + Simplify-Pass
+- [x] Siehe Verifikation unten; danach Multi-Agent-Code-Review (adversarial verify) + Simplify-Pass
 
 ## Ausführungsstrategie (parallele Rollen-Agenten)
 

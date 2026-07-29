@@ -96,4 +96,5 @@ curl -fsS http://localhost:8000/api/health | jq -r .database
 | Umgebung antwortet nicht | `IMAGE_TAG=$(deploy/scripts/state.sh get int last_green) deploy/scripts/deploy.sh int` |
 | Grafana-Panels leer | Ops-Stack neu starten: `docker compose -p nextgen-ops -f deploy/compose/docker-compose.ops.yml restart` |
 | Run hängt im Approval | Environments-Tab → Review deployments → Approve |
+| Approval-Gate greift nicht (Abnahme deployt sofort) | Repo muss **public** sein (Free-Plan-Limitierung) und Reviewer gesetzt: `gh api repos/gosim/NextGen-CICD/environments/abnahme --jq '.protection_rules'` |
 | Alles kaputt, 2 min bis Auftritt | Alle App-Stacks laufen unabhängig von GitHub weiter — Demo mit lokalen Tabs + Grafana beginnen, Pipeline später zeigen |

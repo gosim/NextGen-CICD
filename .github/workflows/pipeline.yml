@@ -6,6 +6,10 @@ name: Pipeline
 on:
   push:
     branches: [main]
+    # Reine Doku-Änderungen lösen kein Deployment aus
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
     inputs:
       demo_flaky:
