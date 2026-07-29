@@ -173,20 +173,31 @@ jobs:
     name: '⛑ Automatischer Rollback (${{ inputs.env_key }})'
     runs-on: [self-hosted, macOS, deploy]
     needs: [prepare, deploy, gate]
-    if: failure()
+    # Auch bei cancelled(): bricht die Concurrency der Eltern-Pipeline einen Lauf
+    # mitten in Deploy/Gate ab, stellt dieser Job die Umgebung trotzdem wieder her —
+    # eine halb deployte Umgebung darf nie liegen bleiben.
+    if: failure() || cancelled()
+    permissions:
+      contents: read
+      deployments: write
     steps:
       - uses: actions/checkout@v4
       - name: App-Version + Datenbank wiederherstellen
         run: |
           LAST_GREEN='${{ needs.prepare.outputs.last_green }}'
           BACKUP_FILE='${{ needs.prepare.outputs.backup_file }}'
+          CURRENT="$(deploy/scripts/state.sh get ${{ inputs.env_key }} current)"
           if [ -z "$LAST_GREEN" ]; then
-            echo "⚠️ Bootstrap-Fall: keine letzte grüne Version bekannt — Stack wird gestoppt statt zurückgerollt."
-            docker compose -p 'nextgen-${{ inputs.env_key }}' stop || true
-            deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' '${{ inputs.image_tag }}' \
-              '${{ github.sha }}' '${{ github.actor }}' failed '' \
-              '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-            echo "⚠️ **${{ inputs.env_key }}**: Gate rot beim Bootstrap — kein Rollback-Ziel, Stack gestoppt." >> "$GITHUB_STEP_SUMMARY"
+            if [ "$CURRENT" = '${{ inputs.image_tag }}' ]; then
+              echo "⚠️ Bootstrap-Fall: keine letzte grüne Version bekannt — Stack wird gestoppt statt zurückgerollt."
+              docker compose -p 'nextgen-${{ inputs.env_key }}' stop || true
+              deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' '${{ inputs.image_tag }}' \
+                '${{ github.sha }}' '${{ github.actor }}' failed '' \
+                '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+              echo "⚠️ **${{ inputs.env_key }}**: Gate rot beim Bootstrap — kein Rollback-Ziel, Stack gestoppt." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Lauf endete vor dem Deployment (kein last_green, Umgebung unverändert) — nichts wiederherzustellen."
+            fi
             exit 0
           fi
           if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
@@ -201,6 +212,23 @@ jobs:
           deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' "$LAST_GREEN" \
             '${{ github.sha }}' '${{ github.actor }}' rolled_back '' \
             '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          # Environments-Seite korrigieren (best effort): das Deployment der fehlgeschlagenen
+          # Version deaktivieren und last_green als aktives Deployment nachziehen — sonst
+          # zeigt GitHub dauerhaft die Version an, die gar nicht mehr läuft.
+          API="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+          AUTH='Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'
+          DEP_ID="$(curl -fsS -H "$AUTH" "$API/deployments?environment=${{ inputs.gh_environment }}&per_page=1" | jq -r '.[0].id // empty' || true)"
+          if [ -n "$DEP_ID" ]; then
+            curl -fsS -X POST -H "$AUTH" "$API/deployments/$DEP_ID/statuses" \
+              -d '{"state":"inactive"}' >/dev/null || true
+          fi
+          NEW_DEP="$(curl -fsS -X POST -H "$AUTH" "$API/deployments" \
+            -d "{\"ref\":\"${LAST_GREEN#sha-}\",\"environment\":\"${{ inputs.gh_environment }}\",\"auto_merge\":false,\"required_contexts\":[],\"description\":\"Automatischer Rollback auf $LAST_GREEN\"}" \
+            | jq -r '.id // empty' || true)"
+          if [ -n "$NEW_DEP" ]; then
+            curl -fsS -X POST -H "$AUTH" "$API/deployments/$NEW_DEP/statuses" \
+              -d '{"state":"success","environment_url":"http://localhost:${{ inputs.frontend_port }}"}' >/dev/null || true
+          fi
           {
             echo "## ⛑ Automatischer Rollback durchgeführt"
             echo ""

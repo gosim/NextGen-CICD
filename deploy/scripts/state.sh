@@ -27,7 +27,10 @@ case "$CMD" in
       VALUE="${PAIR#*=}"
       jq --arg k "$KEY" --arg v "$VALUE" '.[$k] = $v' "$TMP" > "$TMP.new" && mv "$TMP.new" "$TMP"
     done
-    jq --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated_at = $t' "$TMP" > "$STATE_FILE"
+    # Finaler Write atomar (Temp + mv): ein Abbruch mittendrin darf die
+    # Wahrheitsdatei für den Rollback niemals leeren oder korrumpieren.
+    jq --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated_at = $t' "$TMP" > "$TMP.final" \
+      && mv "$TMP.final" "$STATE_FILE"
     rm -f "$TMP"
     ;;
   *)

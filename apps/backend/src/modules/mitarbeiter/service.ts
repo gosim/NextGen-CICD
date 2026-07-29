@@ -75,7 +75,10 @@ export async function listMitarbeiter(
   const conditions: SQL[] = [];
 
   if (filter.search) {
-    const pattern = `%${filter.search}%`;
+    // LIKE-Metazeichen escapen, damit z.B. die Suche nach "100%" literal matcht
+    // (Postgres-Default-Escape-Zeichen ist der Backslash).
+    const escaped = filter.search.replace(/[\\%_]/g, '\\$&');
+    const pattern = `%${escaped}%`;
     const searchCondition = or(
       ilike(mitarbeiter.vorname, pattern),
       ilike(mitarbeiter.nachname, pattern),

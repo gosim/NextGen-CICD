@@ -42,8 +42,12 @@ export default defineConfig({
     },
     {
       // Volles Regressions-Gate gegen Integration (8 Tests + Flaky-Demo).
+      // grepInvert direkt in der Config: ein quarantänisierter Test (@quarantine
+      // ZUSÄTZLICH zum bestehenden Tag) fällt damit garantiert aus dem Gate,
+      // egal wie der Runner aufgerufen wird.
       name: 'int-regression',
       grep: /@regression/,
+      grepInvert: /@quarantine/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'] },
     },
@@ -51,6 +55,7 @@ export default defineConfig({
       // Kritische Geschäftsprozesse als Abnahme-Gate (Anlegen/Bearbeiten/Löschen).
       name: 'abnahme',
       grep: /@abnahme/,
+      grepInvert: /@quarantine/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'] },
     },
@@ -58,6 +63,7 @@ export default defineConfig({
       // Read-only Smoke gegen PROD — bewusst OHNE setup-Dependency (kein Reset auf PROD).
       name: 'smoke',
       grep: /@smoke/,
+      grepInvert: /@quarantine/,
       use: { ...devices['Desktop Chrome'] },
     },
     {

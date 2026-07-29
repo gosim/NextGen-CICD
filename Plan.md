@@ -157,44 +157,44 @@ Environments `integration` (keine Reviewer) / `abnahme` / `prod` (Required Revie
 ## Tasks
 
 ### Phase 0 — Voraussetzungen & Setup (minimaler Host-Footprint)
-- [ ] `Plan.md` (dieser Plan) ins Repo-Root committen
-- [ ] Homebrew-Installationen: `brew install --cask docker` (Docker Desktop), `brew install gh jq` — **kein** Node/pnpm auf dem Host
-- [ ] Docker Desktop starten + Ressourcen-Limit setzen, `gh auth login` (User-Interaktion nötig), Repo-Visibility prüfen (privat empfohlen)
-- [ ] `deploy/scripts/dev.sh` (Node-Wegwerf-Container-Wrapper) anlegen; Verzeichnisse `~/deployments/{state,backups}` anlegen
+- [x] `Plan.md` (dieser Plan) ins Repo-Root committen
+- [x] Homebrew-Installationen: `brew install --cask docker` (Docker Desktop), `brew install gh jq` — **kein** Node/pnpm auf dem Host
+- [x] Docker Desktop starten + Ressourcen-Limit setzen, `gh auth login` (User-Interaktion nötig), Repo-Visibility prüfen (privat empfohlen)
+- [x] `deploy/scripts/dev.sh` (Node-Wegwerf-Container-Wrapper) anlegen; Verzeichnisse `~/deployments/{state,backups}` anlegen
 
 ### Phase 1 — Monorepo-Gerüst + Shared
-- [ ] pnpm-workspace, `tsconfig.base.json` (strict), Root-Scripts, ESLint/Prettier
-- [ ] `packages/shared`: Zod-Schemas Mitarbeiter/Abteilung, DTO-Types, Fehlerformat
+- [x] pnpm-workspace, `tsconfig.base.json` (strict), Root-Scripts, ESLint/Prettier
+- [x] `packages/shared`: Zod-Schemas Mitarbeiter/Abteilung, DTO-Types, Fehlerformat
 
 ### Phase 2 — Backend (parallel zu Phase 3 möglich)
-- [ ] Express-App-Factory, Zod-validierte ENV (fail-fast), Drizzle-Schema + generierte SQL-Migrationen + `migrate.ts`, Seed (deterministisch, idempotent)
-- [ ] Routen: health/ready, **info**, CRUD Mitarbeiter, Abteilungen, admin/reset (guarded); Error-Middleware; `DEMO_BUG`-Mechanik
-- [ ] Unit-Tests (Vitest) + API-Tests (Supertest)
+- [x] Express-App-Factory, Zod-validierte ENV (fail-fast), Drizzle-Schema + generierte SQL-Migrationen + `migrate.ts`, Seed (deterministisch, idempotent)
+- [x] Routen: health/ready, **info**, CRUD Mitarbeiter, Abteilungen, admin/reset (guarded); Error-Middleware; `DEMO_BUG`-Mechanik
+- [x] Unit-Tests (Vitest) + API-Tests (Supertest)
 
 ### Phase 3 — Frontend
-- [ ] Mantine-AppShell mit Env-/Versions-Badge (aus `/api/info`), Mitarbeiter-Tabelle mit Suche/Filter, Formular-Modal (Zod-Resolver aus shared), Lösch-Bestätigung, Toasts, Empty-State
-- [ ] `data-testid`-Vertrag umsetzen + dokumentieren; Component-Tests
+- [x] Mantine-AppShell mit Env-/Versions-Badge (aus `/api/info`), Mitarbeiter-Tabelle mit Suche/Filter, Formular-Modal (Zod-Resolver aus shared), Lösch-Bestätigung, Toasts, Empty-State
+- [x] `data-testid`-Vertrag umsetzen + dokumentieren; Component-Tests
 
 ### Phase 4 — Docker & Deploy-Basis
-- [ ] Multi-stage Dockerfiles (Backend: node:22-alpine, non-root, HEALTHCHECK; Frontend: nginx + `/api`-Proxy; Build-Args nur für Version/SHA)
-- [ ] Parametrisierte `docker-compose.yml` (db/migrate/backend/frontend), drei env-Files mit Port-Matrix
-- [ ] `backup.sh`, `restore.sh`, `deploy.sh` (Backup → migrate → up → Healthcheck-Wait)
+- [x] Multi-stage Dockerfiles (Backend: node:22-alpine, non-root, HEALTHCHECK; Frontend: nginx + `/api`-Proxy; Build-Args nur für Version/SHA)
+- [x] Parametrisierte `docker-compose.yml` (db/migrate/backend/frontend), drei env-Files mit Port-Matrix
+- [x] `backup.sh`, `restore.sh`, `deploy.sh` (Backup → migrate → up → Healthcheck-Wait)
 
 ### Phase 5 — E2E-Package
-- [ ] Playwright-Package mit eigenem Dockerfile (`mcr.microsoft.com/playwright`), Config (Projects/Retries/Reporter wie oben), `apiClient`- + Cleanup-Fixtures, Seed-Setup-Project
-- [ ] Die 8 CRUD-Tests mit Tags, `@flaky-demo`-Test, ein `@quarantine`-Beispiel
-- [ ] Flaky-Report-Parser (results.json → Step Summary)
+- [x] Playwright-Package mit eigenem Dockerfile (`mcr.microsoft.com/playwright`), Config (Projects/Retries/Reporter wie oben), `apiClient`- + Cleanup-Fixtures, Seed-Setup-Project
+- [x] Die 8 CRUD-Tests mit Tags, `@flaky-demo`-Test, ein `@quarantine`-Beispiel
+- [x] Flaky-Report-Parser (results.json → Step Summary)
 
 ### Phase 6 — Pipeline
-- [ ] Composite Actions: deploy-stack, db-backup, db-restore, run-e2e, release-state
-- [ ] `_ci.yml` (lint, typecheck, unit/API-Tests, buildx build+push GHCR, sha-Tag als Output), `pr.yml`
-- [ ] `_deploy.yml` (prepare→deploy→gate→promote | rollback; environment per Input; concurrency pro Env)
-- [ ] `pipeline.yml` (needs-Kette, workflow_dispatch mit Demo-Inputs), `rollback-manual.yml`
+- [x] Composite Actions: deploy-stack, db-backup, db-restore, run-e2e, release-state
+- [x] `_ci.yml` (lint, typecheck, unit/API-Tests, buildx build+push GHCR, sha-Tag als Output), `pr.yml`
+- [x] `_deploy.yml` (prepare→deploy→gate→promote | rollback; environment per Input; concurrency pro Env)
+- [x] `pipeline.yml` (needs-Kette, workflow_dispatch mit Demo-Inputs), `rollback-manual.yml`
 
 ### Phase 7 — Observability-Dashboard (Grafana)
-- [ ] `docker-compose.ops.yml`: Grafana (anonymer Viewer, provisioniert) + ops-db (Schema `deployments`, `test_runs` via Init-SQL)
-- [ ] `deploy/grafana/provisioning`: Datasources (ops-Postgres, Infinity) + Dashboard-JSON („NextGen CICD — Environments" mit den 4 Panel-Gruppen)
-- [ ] `ops-event.sh` + Pipeline-Integration: Events aus deploy/promote/rollback + Testergebnisse (inkl. flaky-Zahl) fail-safe einspeisen
+- [x] `docker-compose.ops.yml`: Grafana (anonymer Viewer, provisioniert) + ops-db (Schema `deployments`, `test_runs` via Init-SQL)
+- [x] `deploy/grafana/provisioning`: Datasources (ops-Postgres, Infinity) + Dashboard-JSON („NextGen CICD — Environments" mit den 4 Panel-Gruppen)
+- [x] `ops-event.sh` + Pipeline-Integration: Events aus deploy/promote/rollback + Testergebnisse (inkl. flaky-Zahl) fail-safe einspeisen
 
 ### Phase 8 — GitHub- & Runner-Setup
 - [ ] Environments + Protection Rules + Variables/Secrets via `gh api` anlegen
@@ -202,8 +202,8 @@ Environments `integration` (keine Reviewer) / `abnahme` / `prod` (Required Revie
 - [ ] Branch Protection `main`
 
 ### Phase 9 — Doku & Präsentation
-- [ ] `docs/architecture.md` (Architektur- + Pipeline-Flow als Mermaid), `docs/testkonzept.md` (Pyramide, Flaky-/Quarantäne-Prozess), `docs/demo-runbook.md` (Drehbuch in 4 Akten: Normalzustand grün → Bad Commit → Gate rot → Trace-Viewer → Auto-Rollback → Flaky-Demo → Quarantäne; Grafana als durchgehender Beamer-Anker)
-- [ ] README neu schreiben (Projektüberblick, Quickstart, Badges, Environments-Link)
+- [x] `docs/architecture.md` (Architektur- + Pipeline-Flow als Mermaid), `docs/testkonzept.md` (Pyramide, Flaky-/Quarantäne-Prozess), `docs/demo-runbook.md` (Drehbuch in 4 Akten: Normalzustand grün → Bad Commit → Gate rot → Trace-Viewer → Auto-Rollback → Flaky-Demo → Quarantäne; Grafana als durchgehender Beamer-Anker)
+- [x] README neu schreiben (Projektüberblick, Quickstart, Badges, Environments-Link)
 
 ### Phase 10 — Verifikation & Qualitäts-Pass
 - [ ] Siehe Verifikation unten; danach Multi-Agent-Code-Review (adversarial verify) + Simplify-Pass

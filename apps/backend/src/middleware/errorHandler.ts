@@ -79,6 +79,19 @@ export function errorHandler(
     return;
   }
 
+  // FK-Verletzung (23503): unbekannte abteilungId ist ein Client-Fehler, kein 500.
+  if (isPgError(err) && err.code === '23503') {
+    const body: ApiErrorBody = {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Referenzierter Datensatz existiert nicht',
+        details: [{ field: 'abteilungId', message: 'Unbekannte Abteilung' }],
+      },
+    };
+    res.status(400).json(body);
+    return;
+  }
+
   console.error('Unerwarteter Fehler:', err);
   const body: ApiErrorBody = {
     error: { code: 'INTERNAL', message: 'Interner Serverfehler' },

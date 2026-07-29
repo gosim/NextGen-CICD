@@ -9,7 +9,10 @@ import {
 } from '@nextgen/shared';
 import type { Database } from '../../db/client.js';
 import type { Env } from '../../config/env.js';
+import { NotFoundError } from '../../errors.js';
 import { validate } from '../../middleware/validate.js';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import {
   createMitarbeiter,
   deleteMitarbeiter,
@@ -49,6 +52,16 @@ function parseFilter(query: Record<string, unknown>): MitarbeiterFilter {
  */
 export function mitarbeiterRouter(db: Database, env: Env): Router {
   const router = Router();
+
+  // Ungültige UUIDs sind fachlich "nicht gefunden" (404) — ohne diesen Guard
+  // würde Postgres mit 22P02 antworten und als 500 INTERNAL durchschlagen.
+  router.param('id', (_req, _res, next, id: string) => {
+    if (!UUID_REGEX.test(id)) {
+      next(new NotFoundError('Mitarbeiter nicht gefunden'));
+      return;
+    }
+    next();
+  });
 
   router.get('/', async (req, res, next) => {
     try {

@@ -8,10 +8,24 @@ ENV_NAME="${1:?Verwendung: restore.sh <env> <backup-file>}"
 BACKUP_FILE="${2:?Backup-Datei fehlt}"
 PROJECT="nextgen-$ENV_NAME"
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSE_FILE="$ROOT/deploy/compose/docker-compose.yml"
+ENV_FILE="$ROOT/deploy/env/$ENV_NAME.env"
+
 if [ ! -f "$BACKUP_FILE" ]; then
   echo "FEHLER: Backup-Datei nicht gefunden: $BACKUP_FILE" >&2
   exit 1
 fi
+
+echo "Stelle sicher, dass die DB läuft (z.B. nach Docker-Neustart)…" >&2
+docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db >/dev/null
+for i in $(seq 1 24); do
+  if docker compose -p "$PROJECT" exec -T db pg_isready -U app -d app >/dev/null 2>&1; then
+    break
+  fi
+  [ "$i" = "24" ] && { echo "FEHLER: DB wurde nicht bereit." >&2; exit 1; }
+  sleep 5
+done
 
 echo "Stoppe Backend, damit der Restore keine offenen Connections vorfindet…" >&2
 docker compose -p "$PROJECT" stop backend >/dev/null

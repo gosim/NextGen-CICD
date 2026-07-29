@@ -21,7 +21,7 @@ Ausführlich dokumentiert in:
 
 Auf dem Host wird bewusst nur das Minimum installiert — Node, pnpm, Playwright und Postgres-Client laufen ausschließlich in Containern:
 
-- **Docker Desktop** (`brew install --cask docker`)
+- **Docker Desktop** (`brew install --cask docker-desktop` — fragt nach dem Admin-Passwort; alternativ DMG von docker.com)
 - **GitHub CLI** (`brew install gh`), danach `gh auth login`
 - **jq** (`brew install jq`)
 
@@ -38,12 +38,12 @@ deploy/scripts/dev.sh pnpm test
 
 ### Lokale Stacks starten
 
-Jede Umgebung ist ein eigenes Compose-Projekt mit eigenem env-File:
+Jede Umgebung ist ein eigenes Compose-Projekt mit eigenem env-File. `deploy.sh` kapselt Pull, Migrations-One-Shot und Healthcheck-Wait (IMAGE_TAG ist Pflicht — die Pipeline setzt ihn auf den Commit-Tag, lokal tut es jeder gebaute Tag):
 
 ```bash
-docker compose -p nextgen-int     --env-file deploy/env/int.env     -f deploy/compose/docker-compose.yml up -d --wait
-docker compose -p nextgen-abnahme --env-file deploy/env/abnahme.env -f deploy/compose/docker-compose.yml up -d --wait
-docker compose -p nextgen-prod    --env-file deploy/env/prod.env    -f deploy/compose/docker-compose.yml up -d --wait
+IMAGE_TAG=sha-local deploy/scripts/deploy.sh int
+IMAGE_TAG=sha-local deploy/scripts/deploy.sh abnahme
+IMAGE_TAG=sha-local deploy/scripts/deploy.sh prod
 
 # Ops-Stack (Grafana-Dashboard)
 docker compose -p nextgen-ops -f deploy/compose/docker-compose.ops.yml up -d

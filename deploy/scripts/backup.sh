@@ -18,8 +18,20 @@ if ! docker compose -p "$PROJECT" ps --status running db 2>/dev/null | grep -q d
   exit 0
 fi
 
+if ! docker compose -p "$PROJECT" exec -T db pg_isready -U app -d app >/dev/null 2>&1; then
+  echo "FEHLER: DB-Container läuft, ist aber nicht bereit — Deployment ohne Backup wäre riskant." >&2
+  exit 1
+fi
+
 FILE="$BACKUP_DIR/$(date +%Y-%m-%dT%H-%M-%S)_${TAG}.dump"
-docker compose -p "$PROJECT" exec -T db pg_dump -U app -Fc app > "$FILE"
+# Erst in Temp-Datei dumpen und atomar umbenennen: ein fehlgeschlagener pg_dump
+# darf keinen leeren/halben Dump als vermeintlich gültiges Backup hinterlassen.
+if ! docker compose -p "$PROJECT" exec -T db pg_dump -U app -Fc app > "$FILE.tmp"; then
+  rm -f "$FILE.tmp"
+  echo "FEHLER: pg_dump fehlgeschlagen — kein Backup erstellt, Deployment wird abgebrochen." >&2
+  exit 1
+fi
+mv "$FILE.tmp" "$FILE"
 
 # Retention: alles außer den 10 neuesten löschen
 ls -t "$BACKUP_DIR"/*.dump 2>/dev/null | tail -n +11 | while read -r OLD; do rm -f "$OLD"; done

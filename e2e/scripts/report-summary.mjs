@@ -20,6 +20,10 @@ function print(line) {
 function collectTests(suite, acc) {
   for (const spec of suite.specs ?? []) {
     for (const test of spec.tests ?? []) {
+      // Der setup-Baseline-Lauf ist kein fachlicher Gate-Test — nicht mitzählen.
+      if (test.projectName === 'setup') {
+        continue;
+      }
       acc.push({ title: spec.title, status: test.status });
     }
   }
@@ -97,7 +101,10 @@ function run() {
 
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
-    appendFileSync(githubOutput, `flaky=${flaky}\nfailed=${failed}\npassed=${passed}\ntotal=${total}\n`);
+    appendFileSync(
+      githubOutput,
+      `flaky=${flaky}\nfailed=${failed}\npassed=${passed}\nskipped=${skipped}\ntotal=${total}\n`,
+    );
   }
 }
 

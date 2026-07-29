@@ -17,8 +17,10 @@ on:
         type: boolean
         default: false
 
-# Neuester Stand gewinnt: ein Run, der noch im Approval wartet, wird durch neue Commits abgelöst.
-# Laufende Deploy-Jobs selbst sind über die Concurrency-Gruppen in _deploy.yml geschützt.
+# Neuester Stand gewinnt: ein Run, der noch im Approval wartet, wird durch neue Commits
+# abgelöst. ACHTUNG: Das Cancel trifft auch gerade laufende Deploy-/Gate-Jobs — deshalb
+# läuft der Rollback in _deploy.yml auch bei `cancelled()` und stellt die Umgebung wieder
+# her, bevor der nächste Run (auf dem einen Runner serialisiert) deployt.
 concurrency:
   group: cd-pipeline
   cancel-in-progress: true
@@ -38,6 +40,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      deployments: write
     secrets: inherit
     with:
       env_key: int
@@ -54,6 +57,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      deployments: write
     secrets: inherit
     with:
       env_key: abnahme
@@ -68,6 +72,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      deployments: write
     secrets: inherit
     with:
       env_key: prod
