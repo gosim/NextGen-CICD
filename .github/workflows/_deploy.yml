@@ -106,6 +106,16 @@ jobs:
     needs: deploy
     steps:
       - uses: actions/checkout@v4
+      # Der Gate-Job pullt das E2E-Image selbst — gleiche Keychain-freie
+      # Docker-Config wie im deploy-Job (siehe Kommentar dort).
+      - name: GHCR-Login (Keychain-frei)
+        run: |
+          DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
+          echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
+          export DOCKER_CONFIG
+          mkdir -p "$DOCKER_CONFIG"
+          printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
+          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
       - name: E2E-Tests gegen die deployte Umgebung (im Playwright-Container)
         id: run
         run: |
