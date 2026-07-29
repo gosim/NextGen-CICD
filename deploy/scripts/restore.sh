@@ -18,7 +18,10 @@ if [ ! -f "$BACKUP_FILE" ]; then
 fi
 
 echo "Stelle sicher, dass die DB läuft (z.B. nach Docker-Neustart)…" >&2
-docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db >/dev/null
+# IMAGE_TAG wird vom db-Service nicht benutzt, aber Compose interpoliert die
+# gesamte Datei — ohne Wert würde ${IMAGE_TAG:?} hier abbrechen.
+IMAGE_TAG="${IMAGE_TAG:-restore-unused}" \
+  docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db >/dev/null
 for i in $(seq 1 24); do
   if docker compose -p "$PROJECT" exec -T db pg_isready -U app -d app >/dev/null 2>&1; then
     break
