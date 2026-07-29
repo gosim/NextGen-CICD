@@ -1,0 +1,12 @@
+# Dashboards as Code — lädt alle JSON-Dashboards aus dem gemounteten Ordner.
+apiVersion: 1
+
+providers:
+  - name: nextgen
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

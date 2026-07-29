@@ -1,0 +1,27 @@
+# Datasources as Code — werden beim Grafana-Start automatisch angelegt.
+apiVersion: 1
+
+datasources:
+  # Ops-Datenbank: Deployment-Historie + Testläufe.
+  - name: OpsDB
+    uid: ops-postgres
+    type: postgres
+    access: proxy
+    url: ops-db:5432
+    database: ops
+    user: ops
+    isDefault: true
+    editable: true
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+    secureJsonData:
+      password: ops
+
+  # Live-Poll gegen die App-Umgebungen (/api/info, /api/health) auf dem Host.
+  - name: Infinity
+    uid: infinity
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    isDefault: false
+    editable: true

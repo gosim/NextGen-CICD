@@ -1,0 +1,16 @@
+# PR-Validierung: volle Qualitätsprüfung + Docker-Builds OHNE Push.
+# Bewusst auf GitHub-hosted Runnern — Fremdcode aus PRs läuft nie auf dem Deploy-Runner.
+name: PR-Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_ci.yml
+    with:
+      push_images: false

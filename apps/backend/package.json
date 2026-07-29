@@ -1,0 +1,31 @@
+{
+  "name": "@nextgen/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": ["dist", "drizzle"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js",
+    "migrate": "node dist/migrate.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "zod": "^3.24.1",
+    "drizzle-orm": "^0.38.3",
+    "pg": "^8.13.1",
+    "@nextgen/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "drizzle-kit": "^0.30.1",
+    "vitest": "^2.1.8",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2"
+  }
+}

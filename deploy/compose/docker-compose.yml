@@ -1,0 +1,60 @@
+# Parametrisierter App-Stack — wird pro Umgebung mit eigenem Projektnamen und env-File gestartet:
+#   docker compose -p nextgen-<env> --env-file deploy/env/<env>.env -f deploy/compose/docker-compose.yml up -d --wait
+# IMAGE_TAG und REGISTRY kommen aus der Umgebung (Pipeline) bzw. dem env-File.
+name: nextgen
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt}
+    ports:
+      - '${DB_PORT:?DB_PORT fehlt}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d app']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: ${REGISTRY:?REGISTRY fehlt}/backend:${IMAGE_TAG:?IMAGE_TAG fehlt}
+    command: ['node', 'dist/migrate.js']
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+      APP_ENV: ${APP_ENV:?APP_ENV fehlt}
+      SEED_BASELINE: ${SEED_BASELINE:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  backend:
+    image: ${REGISTRY}/backend:${IMAGE_TAG}
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+      APP_ENV: ${APP_ENV}
+      PORT: '3000'
+      ENABLE_TEST_RESET: ${ENABLE_TEST_RESET:-false}
+      DEMO_BUG: ${DEMO_BUG:-none}
+    ports:
+      - '${API_PORT:?API_PORT fehlt}:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    image: ${REGISTRY}/frontend:${IMAGE_TAG}
+    ports:
+      - '${FRONTEND_PORT:?FRONTEND_PORT fehlt}:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

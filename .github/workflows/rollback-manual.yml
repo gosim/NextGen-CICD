@@ -1,0 +1,63 @@
+# Manueller Rollback als Notfallhebel + Demo: beliebige Umgebung auf eine Version zurücksetzen
+# (Default: letzte grüne Version), optional inkl. Restore des letzten DB-Backups.
+name: Manueller Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ziel-Umgebung'
+        type: choice
+        options: [int, abnahme, prod]
+        required: true
+      image_tag:
+        description: 'Image-Tag (leer = letzte grüne Version)'
+        type: string
+        default: ''
+      restore_db:
+        description: 'Datenbank aus letztem Backup wiederherstellen'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  rollback:
+    name: 'Rollback ${{ inputs.environment }}'
+    runs-on: [self-hosted, macOS, deploy]
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    environment:
+      name: ${{ (inputs.environment == 'int' && 'integration') || inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: GHCR-Login
+        run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+      - name: Rollback durchführen
+        run: |
+          ENV_KEY='${{ inputs.environment }}'
+          TARGET_TAG='${{ inputs.image_tag }}'
+          if [ -z "$TARGET_TAG" ]; then
+            TARGET_TAG="$(deploy/scripts/state.sh get "$ENV_KEY" last_green)"
+          fi
+          if [ -z "$TARGET_TAG" ]; then
+            echo "FEHLER: Keine Zielversion — weder Input noch last_green vorhanden." >&2
+            exit 1
+          fi
+          if [ '${{ inputs.restore_db }}' = 'true' ]; then
+            BACKUP_FILE="$(deploy/scripts/state.sh get "$ENV_KEY" last_backup)"
+            if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
+              deploy/scripts/restore.sh "$ENV_KEY" "$BACKUP_FILE"
+            else
+              echo "⚠️ Kein Backup im State gefunden — DB-Restore übersprungen."
+            fi
+          fi
+          IMAGE_TAG="$TARGET_TAG" DEMO_BUG=none deploy/scripts/deploy.sh "$ENV_KEY"
+          deploy/scripts/state.sh set "$ENV_KEY" current="$TARGET_TAG"
+          deploy/scripts/ops-event.sh deployment "$ENV_KEY" "$TARGET_TAG" \
+            '${{ github.sha }}' '${{ github.actor }}' rolled_back '' \
+            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          echo "⛑ **Manueller Rollback**: \`$ENV_KEY\` läuft wieder auf \`$TARGET_TAG\`." >> "$GITHUB_STEP_SUMMARY"

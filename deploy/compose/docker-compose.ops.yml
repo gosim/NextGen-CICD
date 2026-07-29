@@ -1,0 +1,62 @@
+# Ops-Stack (Observability) — bewusst getrennt vom App-Stack, damit das Dashboard
+# nie ein Single Point of Failure ist. Start:
+#   docker compose -p nextgen-ops -f deploy/compose/docker-compose.ops.yml up -d
+#
+# Relative Pfade werden von Compose v2 relativ zur Compose-Datei aufgelöst:
+#   ./ops-db-init      -> deploy/compose/ops-db-init
+#   ../grafana/...     -> deploy/grafana/...
+services:
+  ops-db:
+    image: postgres:16-alpine
+    # Fester Name: deploy/scripts/ops-event.sh spricht den Container per
+    # `docker exec nextgen-ops-db` an — NICHT umbenennen.
+    container_name: nextgen-ops-db
+    environment:
+      POSTGRES_DB: ops
+      POSTGRES_USER: ops
+      POSTGRES_PASSWORD: ops
+    ports:
+      - '5400:5432'
+    volumes:
+      - ops-db-data:/var/lib/postgresql/data
+      - ./ops-db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ops -d ops']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    container_name: nextgen-ops-grafana
+    ports:
+      - '8000:3000'
+    depends_on:
+      ops-db:
+        condition: service_healthy
+    environment:
+      # Anonymer Viewer-Zugriff: in der Demo kein Login nötig.
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # admin/admin nur zum Editieren.
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Infinity-Plugin für den Live-Poll gegen /api/info und /api/health.
+      # ACHTUNG: Der Download braucht beim ERSTEN Start Internet.
+      GF_INSTALL_PLUGINS: yesoreyeram-infinity-datasource
+      GF_NEWS_NEWS_FEED_ENABLED: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/nextgen-environments.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+    # Damit die Infinity-Datasource die App-Ports auf dem Host erreicht.
+    # Auf Docker Desktop (Mac) ohnehin vorhanden; für Linux hier explizit gemappt.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+
+volumes:
+  ops-db-data:
+  grafana-data:

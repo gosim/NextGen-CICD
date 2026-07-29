@@ -1,0 +1,77 @@
+# Die eine durchgehende CD-Pipeline: CI → INT (auto + Gate) → Abnahme (Approval + Gate) → PROD (Approval + Smoke).
+# Promotion ist strukturell unmöglich ohne grünes Gate (needs-Kette) — dasselbe Image wandert
+# byte-identisch durch alle Umgebungen (build once, deploy many).
+name: Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      demo_flaky:
+        description: 'Demo: absichtlich flaky Test im INT-Gate aktivieren'
+        type: boolean
+        default: false
+      demo_break_deploy:
+        description: 'Demo: kaputtes Deployment (DEMO_BUG=broken-create) auf INT — triggert Rollback'
+        type: boolean
+        default: false
+
+# Neuester Stand gewinnt: ein Run, der noch im Approval wartet, wird durch neue Commits abgelöst.
+# Laufende Deploy-Jobs selbst sind über die Concurrency-Gruppen in _deploy.yml geschützt.
+concurrency:
+  group: cd-pipeline
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_ci.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      push_images: true
+
+  deploy-int:
+    uses: ./.github/workflows/_deploy.yml
+    needs: ci
+    permissions:
+      contents: read
+      packages: read
+    secrets: inherit
+    with:
+      env_key: int
+      gh_environment: integration
+      image_tag: ${{ needs.ci.outputs.image_tag }}
+      gate_project: int-regression
+      frontend_port: '8001'
+      demo_flaky: ${{ inputs.demo_flaky || false }}
+      demo_bug: ${{ (inputs.demo_break_deploy && 'broken-create') || 'none' }}
+
+  deploy-abnahme:
+    uses: ./.github/workflows/_deploy.yml
+    needs: [ci, deploy-int]
+    permissions:
+      contents: read
+      packages: read
+    secrets: inherit
+    with:
+      env_key: abnahme
+      gh_environment: abnahme
+      image_tag: ${{ needs.ci.outputs.image_tag }}
+      gate_project: abnahme
+      frontend_port: '8002'
+
+  deploy-prod:
+    uses: ./.github/workflows/_deploy.yml
+    needs: [ci, deploy-abnahme]
+    permissions:
+      contents: read
+      packages: read
+    secrets: inherit
+    with:
+      env_key: prod
+      gh_environment: prod
+      image_tag: ${{ needs.ci.outputs.image_tag }}
+      gate_project: smoke
+      frontend_port: '8003'

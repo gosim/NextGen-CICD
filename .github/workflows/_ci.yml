@@ -1,0 +1,114 @@
+# Reusable CI: Qualitätsprüfung + Image-Build (build once, deploy many).
+# Läuft IMMER auf GitHub-hosted Runnern — nie auf dem self-hosted Deploy-Runner (Sicherheit).
+name: CI (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      push_images:
+        description: 'Images nach GHCR pushen (nur main-Pipeline, nicht PRs)'
+        type: boolean
+        default: false
+    outputs:
+      image_tag:
+        description: 'Unveränderlicher Image-Tag (sha-<shortsha>) für alle Umgebungen'
+        value: ${{ jobs.meta.outputs.image_tag }}
+
+jobs:
+  quality:
+    name: Lint, Typecheck, Unit- & API-Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Dependencies installieren
+        run: pnpm install --frozen-lockfile
+      - name: Shared-Package bauen
+        run: pnpm --filter @nextgen/shared build
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit- & API-Tests
+        env:
+          TEST_DATABASE_URL: postgres://app:app@localhost:5432/app
+        run: pnpm test
+
+  meta:
+    name: Versions-Metadaten
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+      registry: ${{ steps.vars.outputs.registry }}
+      version: ${{ steps.vars.outputs.version }}
+      build_time: ${{ steps.vars.outputs.build_time }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: vars
+        run: |
+          SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+          echo "image_tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "registry=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+  build-images:
+    name: 'Image: ${{ matrix.image }}'
+    runs-on: ubuntu-latest
+    needs: [quality, meta]
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: backend
+            dockerfile: apps/backend/Dockerfile
+          - image: frontend
+            dockerfile: apps/frontend/Dockerfile
+          - image: e2e
+            dockerfile: e2e/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: GHCR-Login
+        if: inputs.push_images
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ inputs.push_images }}
+          tags: ${{ needs.meta.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
+          build-args: |
+            APP_VERSION=${{ needs.meta.outputs.version }}
+            GIT_SHA=${{ needs.meta.outputs.image_tag }}
+            BUILD_TIME=${{ needs.meta.outputs.build_time }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}

@@ -1,0 +1,173 @@
+# Architektur
+
+## Überblick
+
+NextGen-CICD demonstriert, wie eine GitHub-Actions-Pipeline aussieht, in der Umgebungen **strukturell** grün bleiben — nicht durch Disziplin oder Konvention, sondern weil die Pipeline es technisch erzwingt.
+
+Der Auslöser ist eine reale Erfahrung: In vielen Projekten sind Integrationsumgebungen dauerhaft rot, weil flaky Tests toleriert, Deployments trotz fehlgeschlagener Tests durchgeführt und Rollbacks — wenn überhaupt — manuell und unter Zeitdruck gefahren werden. Diese Demo zeigt das Gegenmodell:
+
+- **Quality Gates**: E2E-Tests gegen die tatsächlich deployte Umgebung entscheiden, ob eine Version dort stehen bleibt. Keine `if: always()`-Klammer führt an einer Promotion vorbei — Beförderung ist ohne grünes Gate strukturell unmöglich (`needs`-Kette).
+- **Automatischer Rollback inklusive Datenbank**: Schlägt das Gate fehl, springt derselbe Workflow-Lauf einen Rollback-Job an, der App **und** Postgres-Stand auf die letzte grüne Version zurücksetzt.
+- **Sichtbares statt verstecktes Flaky-Management**: Ein Test, der erst im Retry besteht, wird nicht stillschweigend grün — er wird als „flaky" markiert, im Step Summary gemeldet und im Dashboard getrendet.
+
+Kernbotschaft der Demo: *Eine Umgebung ist immer grün, weil eine Version, die das Gate nicht besteht, dort niemals stehen bleibt.*
+
+## Systemarchitektur
+
+Drei identisch aufgebaute App-Stacks (Integration, Abnahme, PROD) plus ein vierter, bewusst getrennter Ops-Stack für das Grafana-Dashboard laufen als eigenständige Docker-Compose-Projekte auf demselben Mac. Ein self-hosted GitHub-Runner ist der einzige Akteur, der auf diesem Host deployt; GitHub Actions selbst baut die Images auf gehosteten Runnern und legt sie in der GitHub Container Registry (GHCR) ab.
+
+```mermaid
+flowchart TB
+    subgraph GITHUB["GitHub"]
+        direction LR
+        ACTIONS["GitHub Actions<br/>CI: ubuntu-latest · CD: self-hosted"]
+        REGISTRY[("GHCR<br/>ghcr.io/gosim/nextgen-cicd<br/>Images: backend, frontend, e2e (sha-Tag)")]
+        ACTIONS -- "build & push" --> REGISTRY
+    end
+
+    subgraph MAC["Mac — self-hosted Runner (Labels: self-hosted, macOS, deploy)"]
+        RUNNER(["Runner-Prozess<br/>1 Job gleichzeitig"])
+
+        subgraph STACK_INT["Compose-Stack nextgen-int · 8001 / 3001 / 5401"]
+            FE_INT["frontend<br/>(nginx)"]
+            BE_INT["backend<br/>(express)"]
+            DB_INT[("postgres")]
+            MIG_INT{{"migrate<br/>(one-shot)"}}
+            MIG_INT --> BE_INT
+            FE_INT -- "/api Proxy" --> BE_INT
+            BE_INT --> DB_INT
+        end
+
+        subgraph STACK_ABN["Compose-Stack nextgen-abnahme · 8002 / 3002 / 5402"]
+            FE_ABN["frontend<br/>(nginx)"]
+            BE_ABN["backend<br/>(express)"]
+            DB_ABN[("postgres")]
+            MIG_ABN{{"migrate<br/>(one-shot)"}}
+            MIG_ABN --> BE_ABN
+            FE_ABN -- "/api Proxy" --> BE_ABN
+            BE_ABN --> DB_ABN
+        end
+
+        subgraph STACK_PROD["Compose-Stack nextgen-prod · 8003 / 3003 / 5403"]
+            FE_PROD["frontend<br/>(nginx)"]
+            BE_PROD["backend<br/>(express)"]
+            DB_PROD[("postgres")]
+            MIG_PROD{{"migrate<br/>(one-shot)"}}
+            MIG_PROD --> BE_PROD
+            FE_PROD -- "/api Proxy" --> BE_PROD
+            BE_PROD --> DB_PROD
+        end
+
+        subgraph STACK_OPS["Ops-Stack nextgen-ops · 8000 / 5400"]
+            GRAFANA["grafana<br/>(anonymer Viewer-Zugriff)"]
+            OPSDB[("ops-db<br/>deployments, test_runs")]
+            GRAFANA -- "SQL" --> OPSDB
+        end
+
+        RUNNER -- "docker compose up --wait" --> FE_INT
+        RUNNER -- "docker compose up --wait" --> FE_ABN
+        RUNNER -- "docker compose up --wait" --> FE_PROD
+        RUNNER -- "ops-event.sh (fail-safe)" --> OPSDB
+        GRAFANA -. "Infinity-Datasource<br/>pollt /api/info + /api/health" .-> BE_INT
+        GRAFANA -. "…" .-> BE_ABN
+        GRAFANA -. "…" .-> BE_PROD
+    end
+
+    REGISTRY -- "docker pull sha-&lt;shortsha&gt;" --> RUNNER
+```
+
+Jeder App-Stack besteht aus vier Services: `frontend` (nginx, proxied `/api` same-origin zum Backend, kein CORS nötig), `backend` (Express), `db` (Postgres 16 Alpine, eigenes Volume je Umgebung) und `migrate` — ein One-Shot-Service, der die Drizzle-Migrationen ausführt und danach beendet ist (`service_completed_successfully`). Der Backend-Service startet erst, wenn `migrate` erfolgreich durchgelaufen ist; das Frontend erst, wenn das Backend gesund ist. Getrennte Compose-Projektnamen (`nextgen-int`, `nextgen-abnahme`, `nextgen-prod`, `nextgen-ops`) bedeuten getrennte Netzwerke, Container **und** Volumes — die drei Umgebungen können sich unter keinen Umständen gegenseitig Daten oder Traffic zuspielen.
+
+Der Ops-Stack ist bewusst ein eigenständiges, viertes Compose-Projekt und kein Teil der App-Stacks: Grafana pollt die laufenden Umgebungen direkt über die Infinity-Datasource gegen `http://host.docker.internal:<port>/api/info` und `/api/health` und liest Deployment-/Testlauf-Historie aus der `ops-db`. Ist der Ops-Stack aus (z. B. zwischen Demo-Terminen gestoppt), schreibt `ops-event.sh` seine Events fail-safe ins Leere (`exit 0` trotz Fehler) — das Dashboard ist nie ein Single Point of Failure für ein Deployment.
+
+## Pipeline-Flow
+
+Ein Push auf `main` durchläuft CI einmal und wandert dann als **dasselbe** Image durch alle drei Umgebungen. Jede Umgebungsstufe folgt demselben Muster: Backup → Deploy → Gate → Promote (bei grün) oder Rollback (bei rot). Zwischen Integration und Abnahme sowie zwischen Abnahme und PROD steht eine manuelle GitHub-Environment-Freigabe.
+
+```mermaid
+flowchart TD
+    PUSH(["push main"]) --> CI["CI (_ci.yml, ubuntu-latest)<br/>Lint · Typecheck · Unit-/API-Tests<br/>Build & Push Images (sha-Tag)"]
+
+    CI --> P1["INT · prepare<br/>last_green lesen + pg_dump-Backup"]
+    P1 --> D1["INT · deploy<br/>compose up --wait inkl. migrate"]
+    D1 --> G1{"INT · Gate<br/>@regression"}
+    G1 -- grün --> PR1["INT · promote<br/>last_green = sha"]
+    G1 -- rot --> RB1["INT · Rollback<br/>DB-Restore + last_green redeploy"]
+
+    PR1 --> APP1{{"⏸ Approval Abnahme"}}
+    APP1 --> P2["Abnahme · prepare"]
+    P2 --> D2["Abnahme · deploy"]
+    D2 --> G2{"Abnahme · Gate<br/>@abnahme"}
+    G2 -- grün --> PR2["Abnahme · promote"]
+    G2 -- rot --> RB2["Abnahme · Rollback"]
+
+    PR2 --> APP2{{"⏸ Approval PROD"}}
+    APP2 --> P3["PROD · prepare"]
+    P3 --> D3["PROD · deploy"]
+    D3 --> G3{"PROD · Gate<br/>@smoke (read-only)"}
+    G3 -- grün --> PR3["PROD · promote"]
+    G3 -- rot --> RB3["PROD · Rollback"]
+
+    RB1 -.-> ENDE(["Workflow-Run: rot<br/>Umgebung: grün"])
+    RB2 -.-> ENDE
+    RB3 -.-> ENDE
+    PR3 -.-> ENDE2(["Alle drei Umgebungen grün<br/>auf identischem Image"])
+```
+
+Technisch ist das in drei Workflows abgebildet: `pipeline.yml` (Orchestrierung, `push main` + `workflow_dispatch` mit Demo-Inputs) ruft `_ci.yml` als reusable Workflow und verkettet drei Aufrufe von `_deploy.yml` über `needs: [ci, deploy-<vorstufe>]`. `_deploy.yml` selbst besteht aus den Jobs `prepare → deploy → gate → promote`, plus `rollback` mit `if: failure()` auf denselben drei Vorgänger-Jobs. Weil `promote` und `rollback` beide von `gate` abhängen und sich gegenseitig über Erfolg/Fehlschlag ausschließen, ist es strukturell unmöglich, dass eine Version ohne bestandenes Gate promoted wird.
+
+## Build once, deploy many
+
+Images werden **genau einmal** gebaut — im `ci`-Job von `pipeline.yml`, ausschließlich beim Push auf `main`. Der Tag ist der kurze Git-SHA (`sha-<shortsha>`, `git rev-parse --short=7 HEAD`), unveränderlich und eindeutig einem Commit zugeordnet. Backend, Frontend und E2E-Image werden mit demselben Tag parallel gebaut und nach GHCR gepusht (`ghcr.io/gosim/nextgen-cicd/{backend,frontend,e2e}:sha-<shortsha>`).
+
+Genau dieses Image — byte-identisch, kein Rebuild — durchläuft anschließend INT, Abnahme und PROD. Umgebungsidentität ist **niemals** ein Build-Artefakt, sondern reine Laufzeit-Konfiguration: `APP_ENV`, Ports, `DATABASE_URL` und Demo-Flags (`DEMO_BUG`, `DEMO_FLAKY`) kommen aus dem jeweiligen `deploy/env/<env>.env`-File bzw. werden dem Compose-Stack als Environment-Variable übergeben.
+
+**Die Vite-Falle**: Vite backt `VITE_*`-Variablen zur **Buildzeit** ins Bundle ein. Ein Frontend, das seinen Umgebungsnamen aus einer `VITE_APP_ENV` bezöge, müsste für jede Umgebung neu gebaut werden — das widerspricht „build once, deploy many" fundamental und wäre außerdem falsch, sobald ein Image befördert wird (INT-Build liefe fälschlich mit „PROD"-Label). Deshalb holt sich das Frontend Umgebungsname und Version ausschließlich **zur Laufzeit** von `GET /api/info` (`{version, gitSha, environment, buildTime, demoBug}`) und zeigt sie im farbcodierten Environment-Badge (INT blau, Abnahme orange, PROD grün) sowie im Versions-Badge im Header an. `APP_VERSION`, `GIT_SHA` und `BUILD_TIME` selbst sind zwar Build-Args (sie beschreiben ja das Artefakt, nicht die Umgebung), `APP_ENV` ist strikt ein Laufzeit-Wert.
+
+## State-Tracking
+
+Der operative „Wahrheits"-Zustand jeder Umgebung liegt bewusst **nicht** primär in GitHub, sondern in einer lokalen JSON-Datei auf dem Runner-Host: `~/deployments/state/<env>.json`, verwaltet über `deploy/scripts/state.sh get|set`. Drei Schlüssel:
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `current` | Image-Tag, der aktuell in der Umgebung läuft (unabhängig davon, ob das Gate bestanden hat) |
+| `last_green` | Letzter Image-Tag, der das Gate bestanden hat — einziges gültiges Rollback-Ziel |
+| `last_backup` | Pfad zum zuletzt erstellten `pg_dump`-Backup dieser Umgebung |
+
+Diese Datei liegt außerhalb des Runner-`_work`-Verzeichnisses und übersteht damit Workspace-Cleanups. Der entscheidende Designgrund: **Rollback funktioniert ohne GitHub-API-Zugriff.** Selbst wenn GitHub nicht erreichbar wäre, weiß der Host genau, welche Version zuletzt grün war und wo das passende DB-Backup liegt.
+
+Die zweite Ebene ist reine **Sichtbarkeit**: Jeder `deploy`-Job erzeugt über die GitHub-Deployments-API einen Eintrag (`in_progress` → `success`/`failure`), sichtbar auf der Repo-Seite „Environments". Dort sieht man live, welcher Commit gerade auf welcher Umgebung läuft — der Demo-Effekt, der in Akt 1 des Runbooks genutzt wird, um alle drei Umgebungen synchron auf derselben Version zu zeigen.
+
+## Rollback-Mechanik
+
+Schlägt das Gate fehl, übernimmt der `rollback`-Job in `_deploy.yml` (identischer Ablauf in `rollback-manual.yml` für den manuellen Notfallhebel). Die Reihenfolge ist kritisch — jeder Schritt existiert, weil der vorherige ihn erzwingt:
+
+1. **Backend stoppen** (`docker compose stop backend`) — unterbindet neue DB-Connections, bevor irgendetwas an der Datenbank verändert wird.
+2. **`pg_terminate_backend`** für alle verbleibenden Connections zur Datenbank `app` (außer der eigenen Restore-Session) — ohne diesen Schritt lehnt Postgres den Restore mit „database is being accessed by other users" ab.
+3. **`pg_restore --clean --if-exists`** aus dem Pre-Deploy-Backup (`~/deployments/backups/<env>/<timestamp>_<sha>.dump`, das `prepare` **vor** dem fehlgeschlagenen Deploy angelegt hat) — `--clean --if-exists` räumt vorhandene Objekte idempotent weg, bevor sie neu eingespielt werden.
+4. **`compose up` mit `last_green`** als `IMAGE_TAG` — das Image liegt lokal im Cache (gepinnt über einen zusätzlichen `green-<env>`-Tag, der im `promote`-Job gesetzt wird, damit `docker prune` es nicht wegräumt), ein Registry-Pull ist nicht erforderlich. Anschließend Healthcheck-Wait wie bei jedem regulären Deploy.
+5. **State- und Sichtbarkeits-Update**: `state.sh set <env> current=<last_green>`, GitHub-Deployment-Status `failure` (der Workflow-Run bleibt rot — das ist gewollt: er transportiert die Information „hier gab es ein Problem"), Job-Summary mit Vorher/Nachher-Tabelle, Ops-Event `rolled_back` an die Ops-DB (erscheint in Grafana rot markiert).
+
+Für den **Bootstrap-Fall** — das allererste Deployment einer Umgebung scheitert, es gibt noch kein `last_green` — bricht der Rollback nicht mit einem Crash ab: Der Stack wird gestoppt, eine Warnung ausgegeben, kein Restore versucht. Genau dieses Ergebnisbild ist die Kern-Demo-Botschaft: **Der Workflow-Run ist rot — die Umgebung ist grün.** Eine fehlerhafte Version wurde weder promoted noch bleibt sie stehen.
+
+## Port-Matrix
+
+| Umgebung | Compose-Projekt | Frontend | API | Postgres | Approval |
+|---|---|---|---|---|---|
+| Integration | `nextgen-int` | 8001 | 3001 | 5401 | automatisch |
+| Abnahme | `nextgen-abnahme` | 8002 | 3002 | 5402 | Required Reviewer |
+| PROD | `nextgen-prod` | 8003 | 3003 | 5403 | Required Reviewer |
+| Ops (Grafana) | `nextgen-ops` | 8000 | — | 5400 (ops-db) | — |
+
+Start je Umgebung: `docker compose -p nextgen-<env> --env-file deploy/env/<env>.env -f deploy/compose/docker-compose.yml up -d --wait`. Der Ops-Stack läuft separat über `deploy/compose/docker-compose.ops.yml`.
+
+## Sicherheitsprinzip: self-hosted Runner nur für CD, nur auf `main`
+
+Ein self-hosted Runner auf dem eigenen Mac ist ein reales Sicherheitsrisiko, wenn Fremdcode darauf ausgeführt werden kann — deshalb ist die Trennung strikt:
+
+- **`pr.yml`** (Pull Requests) ruft ausschließlich `_ci.yml` auf und läuft **komplett auf `ubuntu-latest`** (GitHub-hosted). PR-Code — potenziell von außen — kommt niemals auf den self-hosted Runner, auch nicht lesend.
+- **`_ci.yml`** läuft ebenfalls immer auf `ubuntu-latest`, unabhängig davon, ob es von `pr.yml` oder von `pipeline.yml` aufgerufen wird. Lint, Typecheck, Tests und Image-Build passieren nie auf dem Deploy-Host.
+- **`_deploy.yml`** und **`rollback-manual.yml`** laufen ausschließlich auf `[self-hosted, macOS, deploy]` — und werden ausschließlich von `pipeline.yml` erreicht, dessen Push-Trigger auf `branches: [main]` beschränkt ist. `workflow_dispatch` erfordert Schreibrechte auf das Repo. Auf dem self-hosted Runner läuft also nie ungeprüfter PR-Code, sondern immer nur bereits nach `main` gemergter, durch `_ci.yml` bereits geprüfter Code.
+- **Ein Runner, ein Job gleichzeitig**: Der self-hosted Runner nimmt pro Zeitpunkt nur einen Job an. In Kombination mit den Concurrency-Gruppen (`cd-pipeline` auf Pipeline-Ebene, `deploy-<env>` pro Umgebung, `cancel-in-progress: false` für laufende Deploy-/Rollback-Jobs) serialisieren sich Deployments automatisch — es kann nie ein Rollback mitten in einem laufenden Deploy derselben Umgebung stehen.
+
+Empfehlung für den produktiven Nachbau: Repository privat halten, „Require approval for outside collaborators" bei Actions aktivieren.
