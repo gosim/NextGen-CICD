@@ -25,7 +25,7 @@ Drehbuch für die Live-Präsentation vor Enterprise-Teilnehmern. Vier Akte, ca. 
 3. Die INT-Stufe läuft automatisch an (kein Approval für Integration). Beobachten: **🚀 Deploy** (erste Steps: Backup + last_green) → **🛡 Quality Gate** (`@regression`, 8 Testfälle; bei grün laufen am Ende die Promote-Steps).
 4. Sobald `deploy-int` grün ist, wartet `deploy-abnahme` auf **Approval**. Im Run auf „Review deployments" klicken → Umgebung `abnahme` markieren → „Approve and deploy".
 5. Abnahme-Gate (`@abnahme`) läuft durch → `promote`.
-6. Gleiches Spiel für PROD: Approval erteilen → `smoke`-Gate (read-only) → `promote`.
+6. Gleiches Spiel für PROD: Approval erteilen → schlanker `🚀 Deploy` ohne eigenes Gate (die `smoke`-Suite überwacht PROD stündlich im Stabilitäts-Check).
 
 > **Was die Teilnehmer sehen:** Die „Environments"-Seite zeigt für Integration, Abnahme und PROD denselben Commit/dieselbe Version. Auf dem Grafana-Beamer zeigen alle drei Umgebungs-Stat-Panels dieselbe `gitSha`. Im Browser auf Port 8001/8002/8003 ist die neue Textänderung überall sichtbar — bei unterschiedlich farbigem Environment-Badge (INT blau, Abnahme orange, PROD grün).
 

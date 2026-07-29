@@ -16,7 +16,7 @@ Verbindlicher Vertrag zwischen Backend, Frontend und E2E-Tests. Änderungen nur 
 |---|---|---|---|
 | `GET /api/health` | 200 `{"status":"ok"}` | — | Liveness (Docker HEALTHCHECK) |
 | `GET /api/health/ready` | 200 `{"status":"ready"}` | 503 `{"status":"not_ready"}` | Readiness inkl. DB-Ping (`SELECT 1`) |
-| `GET /api/info` | 200 `AppInfo` | — | `{name:"nextgen-stammdaten", version, gitSha, environment, buildTime, demoBug}` |
+| `GET /api/info` | 200 `AppInfo` | — | `{name:"nextgen-stammdaten", version, gitSha, environment, buildTime, demoBug, instance}` (`instance` = Container-Hostname, `os.hostname()`, macht Replica-Load-Balancing sichtbar) |
 | `GET /api/abteilungen` | 200 `Abteilung[]` | — | Sortiert nach `name` asc |
 | `GET /api/mitarbeiter` | 200 `Mitarbeiter[]` | — | Query: `search` (ilike auf vorname/nachname/personalnummer), `status` (`aktiv`\|`inaktiv`), `abteilungId`. Sortiert `nachname` asc. Enthält `abteilungName` (Join) |
 | `POST /api/mitarbeiter` | 201 `Mitarbeiter` | 400, 409 | Body: `MitarbeiterCreate`. 409 bei Duplikat `personalnummer` ODER `email` (`CONFLICT`, message nennt das Feld in `details`). **Bei `DEMO_BUG=broken-create`: 500 `INTERNAL`** + Log-Zeile `DEMO_BUG active: broken-create` |

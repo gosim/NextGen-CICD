@@ -44,7 +44,7 @@ jobs:
     uses: ./.github/workflows/_deploy.yml
     needs: ci
     permissions:
-      contents: read
+      contents: write # gh-pages-Push der Testreports im Gate
       packages: read
       deployments: write
     secrets: inherit
@@ -52,6 +52,7 @@ jobs:
       env_key: int
       gh_environment: integration
       image_tag: ${{ needs.ci.outputs.image_tag }}
+      version: ${{ needs.ci.outputs.version }}
       gate_project: int-regression
       frontend_port: '8001'
       demo_flaky: ${{ inputs.demo_flaky || false }}
@@ -62,7 +63,7 @@ jobs:
     uses: ./.github/workflows/_deploy.yml
     needs: [ci, deploy-int]
     permissions:
-      contents: read
+      contents: write # gh-pages-Push der Testreports im Gate
       packages: read
       deployments: write
     secrets: inherit
@@ -70,12 +71,16 @@ jobs:
       env_key: abnahme
       gh_environment: abnahme
       image_tag: ${{ needs.ci.outputs.image_tag }}
+      version: ${{ needs.ci.outputs.version }}
       gate_project: abnahme
       frontend_port: '8002'
 
+  # PROD bewusst ohne Gate-/Rollback-Knoten (übersichtlicher Graph): Sicherheitsnetz
+  # sind das Abnahme-Gate davor, der stündliche Stabilitäts-Check (smoke, read-only)
+  # und der manuelle Rollback-Workflow.
   deploy-prod:
     name: PROD
-    uses: ./.github/workflows/_deploy.yml
+    uses: ./.github/workflows/_deploy-simple.yml
     needs: [ci, deploy-abnahme]
     permissions:
       contents: read
@@ -86,5 +91,5 @@ jobs:
       env_key: prod
       gh_environment: prod
       image_tag: ${{ needs.ci.outputs.image_tag }}
-      gate_project: smoke
+      version: ${{ needs.ci.outputs.version }}
       frontend_port: '8003'

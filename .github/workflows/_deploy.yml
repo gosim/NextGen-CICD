@@ -38,6 +38,10 @@ on:
         description: 'Demo: Laufzeit-Bug (none | broken-create)'
         type: string
         default: 'none'
+      version:
+        description: 'Menschenlesbare Version (1.0.N) — nur Anzeige; Identität bleibt der sha-Tag'
+        type: string
+        default: ''
 
 # Ein laufendes Deploy/Rollback pro Umgebung darf NIE abgebrochen werden (halb restaurierte DB!)
 concurrency:
@@ -55,130 +59,54 @@ jobs:
       contents: read
       packages: read
     outputs:
-      last_green: ${{ steps.state.outputs.last_green }}
-      backup_file: ${{ steps.backup.outputs.backup_file }}
+      last_green: ${{ steps.stack.outputs.last_green }}
+      backup_file: ${{ steps.stack.outputs.backup_file }}
     steps:
       - uses: actions/checkout@v4
-      - name: Letzte grüne Version lesen
-        id: state
-        run: |
-          LAST_GREEN="$(deploy/scripts/state.sh get ${{ inputs.env_key }} last_green)"
-          echo "last_green=${LAST_GREEN}" >> "$GITHUB_OUTPUT"
-          echo "Letzte grüne Version: ${LAST_GREEN:-<keine — Bootstrap>}"
-      - name: Datenbank-Backup (pg_dump) vor dem Deployment
-        id: backup
-        run: |
-          BACKUP_FILE="$(IMAGE_TAG='${{ inputs.image_tag }}' deploy/scripts/backup.sh ${{ inputs.env_key }})"
-          echo "backup_file=${BACKUP_FILE}" >> "$GITHUB_OUTPUT"
-          if [ -n "$BACKUP_FILE" ]; then
-            deploy/scripts/state.sh set ${{ inputs.env_key }} last_backup="$BACKUP_FILE"
-          fi
-      # Eigene Docker-Config ohne Keychain-Credential-Helper: im LaunchAgent-Kontext
-      # des Runners ist Keychain-Zugriff verboten ("User interaction is not allowed").
-      # Export über GITHUB_ENV, damit alle Folge-Steps dieselbe Config nutzen
-      # (der runner-Kontext ist in job-level env nicht verfügbar).
-      - name: GHCR-Login (Keychain-frei)
-        run: |
-          DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
-          echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
-          export DOCKER_CONFIG
-          mkdir -p "$DOCKER_CONFIG"
-          printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
-          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-      - name: 'Stack deployen: ${{ inputs.image_tag }} → ${{ inputs.env_key }} (compose up --wait, inkl. Migration)'
-        env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
-          DEMO_BUG: ${{ inputs.demo_bug }}
-        run: deploy/scripts/deploy.sh ${{ inputs.env_key }}
-      - name: State & Ops-Event aktualisieren
-        run: |
-          deploy/scripts/state.sh set ${{ inputs.env_key }} current='${{ inputs.image_tag }}'
-          deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' '${{ inputs.image_tag }}' \
-            '${{ github.sha }}' '${{ github.actor }}' deployed '' \
-            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+      - name: 'Stack deployen: ${{ inputs.image_tag }} → ${{ inputs.env_key }}'
+        id: stack
+        uses: ./.github/actions/deploy-stack
+        with:
+          env_key: ${{ inputs.env_key }}
+          image_tag: ${{ inputs.image_tag }}
+          version: ${{ inputs.version }}
+          demo_bug: ${{ inputs.demo_bug }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   gate:
     name: 🛡 Quality Gate
     runs-on: [self-hosted, macOS, deploy]
     needs: deploy
+    permissions:
+      contents: write # gh-pages-Push der Testreports
+      packages: read
     steps:
       - uses: actions/checkout@v4
-      # Der Gate-Job pullt das E2E-Image selbst — gleiche Keychain-freie
-      # Docker-Config wie im deploy-Job (siehe Kommentar dort).
-      - name: GHCR-Login (Keychain-frei)
-        run: |
-          DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
-          echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
-          export DOCKER_CONFIG
-          mkdir -p "$DOCKER_CONFIG"
-          printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
-          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-      - name: 'E2E-Tests (${{ inputs.gate_project }}) gegen die deployte Umgebung'
-        id: run
-        run: |
-          REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
-          OUT="$RUNNER_TEMP/e2e-out"
-          rm -rf "$OUT" && mkdir -p "$OUT/test-results" "$OUT/playwright-report"
-          GATE_START=$(date +%s)
-          echo "gate_start=$GATE_START" >> "$GITHUB_OUTPUT"
-          docker run --rm \
-            -e BASE_URL='http://host.docker.internal:${{ inputs.frontend_port }}' \
-            -e RUN_ID='${{ github.run_id }}' \
-            -e DEMO_FLAKY='${{ inputs.demo_flaky }}' \
-            -e CI=true \
-            -v "$OUT/test-results:/repo/e2e/test-results" \
-            -v "$OUT/playwright-report:/repo/e2e/playwright-report" \
-            "$REGISTRY/e2e:${{ inputs.image_tag }}" \
-            --project='${{ inputs.gate_project }}'
-      - name: Testreport-Zusammenfassung (inkl. Flaky-Warnung)
-        id: summary
-        if: always()
-        run: |
-          REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
-          OUT="$RUNNER_TEMP/e2e-out"
-          if [ ! -f "$OUT/test-results/results.json" ]; then
-            echo "Kein results.json vorhanden — Zusammenfassung übersprungen." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          docker run --rm --entrypoint node \
-            -e GITHUB_STEP_SUMMARY=/ghs -e GITHUB_OUTPUT=/gho \
-            -v "$GITHUB_STEP_SUMMARY:/ghs" -v "$GITHUB_OUTPUT:/gho" \
-            -v "$OUT/test-results:/repo/e2e/test-results" \
-            "$REGISTRY/e2e:${{ inputs.image_tag }}" \
-            scripts/report-summary.mjs
-      - name: Report & Traces als Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: E2E-Suite ausführen (Report, Pages, Ops-Event inklusive)
+        uses: ./.github/actions/run-e2e-suite
         with:
-          name: e2e-report-${{ inputs.env_key }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/e2e-out/playwright-report
-            ${{ runner.temp }}/e2e-out/test-results
-          retention-days: 14
-          if-no-files-found: ignore
-      - name: Ops-Event Testlauf
-        if: always()
-        run: |
-          GATE_END=$(date +%s)
-          DURATION=$((GATE_END - ${{ steps.run.outputs.gate_start || 0 }}))
-          [ "${{ steps.run.outputs.gate_start || 0 }}" = "0" ] && DURATION=''
-          deploy/scripts/ops-event.sh test_run '${{ inputs.env_key }}' '${{ inputs.gate_project }}' \
-            "${{ steps.summary.outputs.total || 0 }}" "${{ steps.summary.outputs.passed || 0 }}" \
-            "${{ steps.summary.outputs.failed || 0 }}" "${{ steps.summary.outputs.flaky || 0 }}" \
-            "${{ steps.summary.outputs.skipped || 0 }}" \
-            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      # ── Promote: nur erreicht, wenn alle Gate-Steps oben grün sind ────────────
+          env_key: ${{ inputs.env_key }}
+          frontend_port: ${{ inputs.frontend_port }}
+          project: ${{ inputs.gate_project }}
+          image_tag: ${{ inputs.image_tag }}
+          demo_flaky: ${{ inputs.demo_flaky }}
+          source: gate
+          version: ${{ inputs.version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      # ── Promote: nur erreicht, wenn das Gate-Verdikt oben grün war ────────────
       - name: 'Promote: last_green fortschreiben & Images gegen Prune pinnen'
         run: |
-          deploy/scripts/state.sh set ${{ inputs.env_key }} last_green='${{ inputs.image_tag }}'
+          deploy/scripts/state.sh set ${{ inputs.env_key }} \
+            last_green='${{ inputs.image_tag }}' last_green_version='${{ inputs.version }}'
           REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
           for IMG in backend frontend e2e; do
             docker tag "$REGISTRY/$IMG:${{ inputs.image_tag }}" "$REGISTRY/$IMG:green-${{ inputs.env_key }}" || true
           done
           deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' '${{ inputs.image_tag }}' \
             '${{ github.sha }}' '${{ github.actor }}' promoted '' \
-            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' || true
-          echo "✅ **${{ inputs.env_key }}** ist grün auf \`${{ inputs.image_tag }}\` — Version als last_green markiert." >> "$GITHUB_STEP_SUMMARY"
+            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            '${{ inputs.version }}' || true
+          echo "✅ **${{ inputs.env_key }}** ist grün auf **v${{ inputs.version }}** (\`${{ inputs.image_tag }}\`) — als last_green markiert." >> "$GITHUB_STEP_SUMMARY"
 
   rollback:
     name: ⛑ Rollback
@@ -228,10 +156,13 @@ jobs:
           fi
           echo "Rolle App zurück auf letzte grüne Version: $LAST_GREEN"
           IMAGE_TAG="$LAST_GREEN" DEMO_BUG=none deploy/scripts/deploy.sh ${{ inputs.env_key }}
-          deploy/scripts/state.sh set ${{ inputs.env_key }} current="$LAST_GREEN"
+          LAST_GREEN_VERSION="$(deploy/scripts/state.sh get ${{ inputs.env_key }} last_green_version)"
+          deploy/scripts/state.sh set ${{ inputs.env_key }} \
+            current="$LAST_GREEN" current_version="$LAST_GREEN_VERSION"
           deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' "$LAST_GREEN" \
             '${{ github.sha }}' '${{ github.actor }}' rolled_back '' \
-            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "$LAST_GREEN_VERSION"
           # Environments-Seite korrigieren (best effort): das Deployment der fehlgeschlagenen
           # Version deaktivieren und last_green als aktives Deployment nachziehen — sonst
           # zeigt GitHub dauerhaft die Version an, die gar nicht mehr läuft.
@@ -255,8 +186,8 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Umgebung | **${{ inputs.env_key }}** |"
-            echo "| Fehlgeschlagene Version | \`${{ inputs.image_tag }}\` |"
-            echo "| Wiederhergestellt auf | \`$LAST_GREEN\` |"
+            echo "| Fehlgeschlagene Version | v${{ inputs.version }} (\`${{ inputs.image_tag }}\`) |"
+            echo "| Wiederhergestellt auf | v${LAST_GREEN_VERSION:-?} (\`$LAST_GREEN\`) |"
             echo "| DB-Restore | ${BACKUP_FILE:-—} |"
             echo ""
             echo "Die Umgebung ist wieder **grün** — die fehlerhafte Version wurde nicht promoted."

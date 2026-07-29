@@ -1,6 +1,13 @@
 # Parametrisierter App-Stack — wird pro Umgebung mit eigenem Projektnamen und env-File gestartet:
 #   docker compose -p nextgen-<env> --env-file deploy/env/<env>.env -f deploy/compose/docker-compose.yml up -d --wait
 # IMAGE_TAG und REGISTRY kommen aus der Umgebung (Pipeline) bzw. dem env-File.
+#
+# Architektur: backend und frontend laufen mit je 2 Replicas (deploy.replicas), damit
+# ein Rolling-Deployment ohne Downtime möglich ist (siehe deploy/scripts/deploy.sh).
+# Weil mehrere Replicas nicht denselben Host-Port publizieren können, veröffentlicht
+# der Service `proxy` (Edge-nginx) die Host-Ports und verteilt via Docker-DNS auf alle
+# Replicas:  FRONTEND_PORT -> proxy:80 -> frontend:80 ,  API_PORT -> proxy:81 -> backend:3000.
+# db behält sein eigenes DB_PORT-Mapping.
 name: nextgen
 
 services:
@@ -40,8 +47,10 @@ services:
       PORT: '3000'
       ENABLE_TEST_RESET: ${ENABLE_TEST_RESET:-false}
       DEMO_BUG: ${DEMO_BUG:-none}
-    ports:
-      - '${API_PORT:?API_PORT fehlt}:3000'
+    # Kein ports-Mapping mehr: mehrere Replicas teilen sich keinen Host-Port.
+    # Erreichbar von aussen über den proxy (API_PORT -> proxy:81 -> backend:3000).
+    deploy:
+      replicas: 2
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -49,11 +58,36 @@ services:
 
   frontend:
     image: ${REGISTRY}/frontend:${IMAGE_TAG}
-    ports:
-      - '${FRONTEND_PORT:?FRONTEND_PORT fehlt}:80'
+    # Kein ports-Mapping mehr: erreichbar über den proxy (FRONTEND_PORT -> proxy:80 -> frontend:80).
+    deploy:
+      replicas: 2
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:1.27-alpine
+    ports:
+      - '${FRONTEND_PORT:?FRONTEND_PORT fehlt}:80'
+      - '${API_PORT:?API_PORT fehlt}:81'
+    volumes:
+      - ../proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    # Bewusst nur service_started (nicht service_healthy): Der Proxy resolved die
+    # Backends per Docker-DNS zur Laufzeit neu. Wuerde er auf healthy warten, muesste
+    # er bei jedem Rolling-Schritt eventuell neu gestartet werden — das wollen wir
+    # gerade vermeiden, damit die Host-Ports durchgehend offen bleiben.
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:80/']
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     restart: unless-stopped
 
 volumes:

@@ -395,7 +395,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT time AS \"Zeit\", env AS \"Umgebung\", image_tag AS \"Version\", status AS \"Status\", actor AS \"Auslöser\", run_url AS \"Run\" FROM deployments ORDER BY time DESC LIMIT 30",
+          "rawSql": "SELECT time AS \"Zeit\", env AS \"Umgebung\", version AS \"Version\", image_tag AS \"Image-Tag\", status AS \"Status\", actor AS \"Auslöser\", run_url AS \"Run\" FROM deployments ORDER BY time DESC LIMIT 30",
           "refId": "A"
         }
       ],
@@ -478,7 +478,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT time, passed, failed, flaky FROM test_runs WHERE env IN ('int', 'abnahme') ORDER BY time",
+          "rawSql": "SELECT time, passed, failed, flaky FROM test_runs WHERE source = 'gate' AND env IN ('int', 'abnahme') ORDER BY time",
           "refId": "A"
         }
       ],
@@ -523,7 +523,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(SUM(flaky), 0) AS flaky FROM test_runs WHERE time > now() - interval '7 days'",
+          "rawSql": "SELECT COALESCE(SUM(flaky), 0) AS flaky FROM test_runs WHERE source = 'gate' AND time > now() - interval '7 days'",
           "refId": "A"
         }
       ],
@@ -616,6 +616,149 @@
       ],
       "title": "Letzte Gate-Dauer",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 15,
+      "panels": [],
+      "title": "Stabilität — stündliche Checks",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "description": "Stündlicher Stabilitäts-Check je Umgebung (Synthetic Monitoring): grün = alles bestanden, gelb = flaky, rot = mindestens ein Fehler. Je ein Band für INT / Abnahme / PROD.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "fillOpacity": 80,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "green", "index": 0, "text": "grün" },
+                "1": { "color": "yellow", "index": 1, "text": "flaky" },
+                "2": { "color": "red", "index": 2, "text": "rot" }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 27 },
+      "id": 16,
+      "options": {
+        "alignValue": "center",
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time, env AS metric, CASE WHEN failed > 0 THEN 2 WHEN flaky > 0 THEN 1 ELSE 0 END AS value FROM test_runs WHERE source = 'stability' AND $__timeFilter(time) ORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Umgebungs-Stabilität (stündlich)",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "ops-postgres" },
+      "description": "Der jeweils jüngste Stabilitäts-Check je Umgebung mit Direktlink zum Playwright-Report.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Zeit" },
+            "properties": [{ "id": "unit", "value": "dateTimeAsLocal" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Fehler" },
+            "properties": [
+              { "id": "color", "value": { "mode": "thresholds" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "text", "value": null },
+                    { "color": "red", "value": 1 }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "report_url" },
+            "properties": [
+              { "id": "displayName", "value": "Report" },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Report öffnen",
+                    "url": "${__data.fields.report_url}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "id": 17,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT DISTINCT ON (env) env AS \"Umgebung\", time AS \"Zeit\", suite AS \"Suite\", version AS \"Version\", passed AS \"OK\", failed AS \"Fehler\", flaky AS \"Flaky\", report_url FROM test_runs WHERE source = 'stability' ORDER BY env, time DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Letzter Check je Umgebung",
+      "type": "table"
     }
   ],
   "preload": false,

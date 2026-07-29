@@ -1,0 +1,57 @@
+# Schlanker Deploy ohne Gate/Rollback-Jobs — für PROD (mit User abgestimmt: die
+# Knoten „Quality Gate" und „Rollback" entfallen dort für einen übersichtlichen Graphen).
+# Sicherheitsnetz für PROD: das Abnahme-Gate davor, der stündliche Stabilitäts-Check
+# (smoke) und der manuelle Rollback-Workflow.
+name: Deploy simple (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      env_key:
+        description: 'Umgebungs-Kürzel: int | abnahme | prod'
+        type: string
+        required: true
+      gh_environment:
+        description: 'GitHub-Environment-Name (Protection Rules!)'
+        type: string
+        required: true
+      image_tag:
+        description: 'Zu deployender Image-Tag (sha-…)'
+        type: string
+        required: true
+      frontend_port:
+        description: 'Host-Port des Frontends dieser Umgebung'
+        type: string
+        required: true
+      version:
+        description: 'Menschenlesbare Version (1.0.N)'
+        type: string
+        default: ''
+
+concurrency:
+  group: deploy-${{ inputs.env_key }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 🚀 Deploy
+    runs-on: [self-hosted, macOS, deploy]
+    environment:
+      name: ${{ inputs.gh_environment }}
+      url: http://localhost:${{ inputs.frontend_port }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stack deployen (Rolling, ohne nachgelagertes Gate)
+        uses: ./.github/actions/deploy-stack
+        with:
+          env_key: ${{ inputs.env_key }}
+          image_tag: ${{ inputs.image_tag }}
+          version: ${{ inputs.version }}
+          mark_green: 'true'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Zusammenfassung
+        run: |
+          echo "✅ **${{ inputs.env_key }}** läuft auf **v${{ inputs.version }}** (\`${{ inputs.image_tag }}\`) — Rolling-Deployment ohne Unterbrechung." >> "$GITHUB_STEP_SUMMARY"

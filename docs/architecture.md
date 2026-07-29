@@ -98,17 +98,24 @@ flowchart TD
     G2 -- grün --> APP2{{"⏸ Approval PROD"}}
     G2 -- rot --> RB2["Abnahme · ⛑ Rollback"]
 
-    APP2 --> D3["PROD · 🚀 Deploy"]
-    D3 --> G3{"PROD · 🛡 Quality Gate<br/>@smoke (read-only)"}
-    G3 -- grün --> ENDE2(["Alle drei Umgebungen grün<br/>auf identischem Image"])
-    G3 -- rot --> RB3["PROD · ⛑ Rollback"]
+    APP2 --> D3["PROD · 🚀 Deploy<br/>(ohne eigenes Gate — bewusst schlank)"]
+    D3 --> ENDE2(["Alle drei Umgebungen grün<br/>auf identischem Image"])
 
     RB1 -.-> ENDE(["Workflow-Run: rot<br/>Umgebung: grün"])
     RB2 -.-> ENDE
-    RB3 -.-> ENDE
 ```
 
+PROD hat bewusst **keine eigenen Gate-/Rollback-Knoten** (übersichtlicher Graph): Was PROD erreicht, hat bereits das volle INT-Gate und das Abnahme-Gate überlebt und ist byte-identisch. Das Sicherheitsnetz für PROD sind der **stündliche Stabilitäts-Check** (read-only Smoke) und der **manuelle Rollback-Workflow**.
+
 Technisch ist das in drei Workflows abgebildet: `pipeline.yml` (Orchestrierung, `push main` + `workflow_dispatch` mit Demo-Inputs) ruft `_ci.yml` als reusable Workflow und verkettet drei Aufrufe von `_deploy.yml` über `needs: [ci, deploy-<vorstufe>]`; die Aufrufer-Jobs heißen `CI`, `INT`, `Abnahme`, `PROD` und gruppieren den Actions-Graphen in saubere Spalten. `_deploy.yml` besteht aus `deploy → gate` plus `rollback` mit `if: failure() || cancelled()`. Die Promote-Schritte sind die letzten Steps des Gate-Jobs — sie werden nur erreicht, wenn alle Tests davor grün waren. Damit ist es strukturell unmöglich, dass eine Version ohne bestandenes Gate promoted wird.
+
+## Stabilitäts-Monitoring (stündlich)
+
+Ergänzend zu den Deployment-Gates führt `stability-check.yml` **stündlich** (Cron, UTC) die drei Gate-Suiten gegen die laufenden Umgebungen aus — INT volle Regression, Abnahme Kernprozesse, PROD read-only Smoke, jeweils mit der aktuell deployten Version aus dem State-File. Ergebnisse fließen mit `source='stability'` in die Ops-DB und erscheinen in Grafana als Stabilitäts-Bänder pro Umgebung (grün/gelb/rot) inkl. klickbarem Testreport-Link. Ein roter Check bedeutet Signal, nicht Rollback: Es wurde nichts deployt — Instabilität zwischen Deployments ist eine Betriebs-Erkenntnis. Betriebsdetails: Läufe stauen sich bei offline-Runner, `concurrency: cancel-in-progress` lässt nur den neuesten laufen; GitHub pausiert Schedules nach 60 Tagen Repo-Inaktivität.
+
+## Skalierung & unterbrechungsfreie Deployments
+
+Jede Umgebung betreibt **2 Replicas** von Frontend und Backend hinter einem Edge-Proxy (nginx), der als einziger die Host-Ports publisht und über die Docker-DNS (`resolver 127.0.0.11`, Re-Resolution alle 5 s) auf alle gesunden Replicas verteilt. Deployments laufen **rolling** (`deploy.sh`): Migration als One-Shot zuerst (Expand/Contract-Prinzip: Schema muss während der Übergangsphase mit alter und neuer Version kompatibel sein), dann je Service 2 neue Replicas zusätzlich starten, auf deren Health warten, alte entfernen — zu jedem Zeitpunkt bedienen gesunde Instanzen den Traffic. Schlägt die neue Version beim Healthcheck fehl, werden nur die neuen Replicas entfernt und die alten laufen unverändert weiter (sicherer Abbruch). Derselbe Mechanismus macht auch Rollbacks unterbrechungsfrei. `GET /api/info` liefert das Feld `instance` (Container-Hostname) — zwei aufeinanderfolgende Aufrufe zeigen das Load-Balancing live.
 
 ## Build once, deploy many
 

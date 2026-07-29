@@ -57,6 +57,26 @@ services:
       - 'host.docker.internal:host-gateway'
     restart: unless-stopped
 
+  portainer:
+    # Leichtgewichtige Docker-UI für die Demo: Container/Logs/Stacks aller
+    # nextgen-Stacks sichtbar, ohne CLI. LTS-Tag = stabile Langzeit-Version.
+    image: portainer/portainer-ce:lts
+    container_name: nextgen-ops-portainer
+    ports:
+      - '9000:9000'
+    volumes:
+      # Docker-Socket bewusst rw (nicht ro): Portainer soll in der Demo auch
+      # aktiv steuern können (Container starten/stoppen, Exec/Logs, Stacks) —
+      # das geht nur mit Schreibzugriff auf den Socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    restart: unless-stopped
+    # WICHTIG: Nach dem ersten Start binnen 5 Minuten unter http://localhost:9000
+    # das Admin-Passwort setzen — sonst sperrt Portainer die Ersteinrichtung aus
+    # Sicherheitsgründen und der Container muss neu gestartet werden
+    # (docker restart nextgen-ops-portainer), um das Zeitfenster erneut zu öffnen.
+
 volumes:
   ops-db-data:
   grafana-data:
+  portainer-data:

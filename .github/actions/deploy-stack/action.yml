@@ -1,0 +1,89 @@
+name: 'Stack deployen'
+description: >-
+  Deployt einen Image-Tag in eine Umgebung: State lesen, pg_dump-Backup,
+  Keychain-freier GHCR-Login, Rolling-Deployment via deploy.sh, State + Ops-Event.
+  Wird vom vollen Deploy-Workflow (_deploy.yml) und vom schlanken PROD-Workflow
+  (_deploy-simple.yml) gemeinsam genutzt.
+
+inputs:
+  env_key:
+    description: 'Umgebungs-Kürzel: int | abnahme | prod'
+    required: true
+  image_tag:
+    description: 'Zu deployender Image-Tag (sha-…)'
+    required: true
+  version:
+    description: 'Menschenlesbare Version (1.0.N)'
+    default: ''
+  demo_bug:
+    description: 'Demo-Laufzeit-Bug (none | broken-create)'
+    default: 'none'
+  mark_green:
+    description: 'true = Deployment gilt ohne Gate als grün (last_green direkt fortschreiben)'
+    default: 'false'
+  github_token:
+    description: 'Token für GHCR-Pull'
+    required: true
+
+outputs:
+  last_green:
+    description: 'Letzte grüne Version VOR diesem Deployment (Rollback-Ziel)'
+    value: ${{ steps.state.outputs.last_green }}
+  backup_file:
+    description: 'Pfad des Pre-Deploy-Backups (leer beim Bootstrap)'
+    value: ${{ steps.backup.outputs.backup_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Letzte grüne Version lesen
+      id: state
+      shell: bash
+      run: |
+        LAST_GREEN="$(deploy/scripts/state.sh get ${{ inputs.env_key }} last_green)"
+        echo "last_green=${LAST_GREEN}" >> "$GITHUB_OUTPUT"
+        echo "Letzte grüne Version: ${LAST_GREEN:-<keine — Bootstrap>}"
+    - name: Datenbank-Backup (pg_dump) vor dem Deployment
+      id: backup
+      shell: bash
+      run: |
+        BACKUP_FILE="$(IMAGE_TAG='${{ inputs.image_tag }}' deploy/scripts/backup.sh ${{ inputs.env_key }})"
+        echo "backup_file=${BACKUP_FILE}" >> "$GITHUB_OUTPUT"
+        if [ -n "$BACKUP_FILE" ]; then
+          deploy/scripts/state.sh set ${{ inputs.env_key }} last_backup="$BACKUP_FILE"
+        fi
+    # Keychain-freie Docker-Config: im LaunchAgent-Kontext des Runners ist
+    # Keychain-Zugriff verboten ("User interaction is not allowed").
+    - name: GHCR-Login (Keychain-frei)
+      shell: bash
+      run: |
+        DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
+        echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
+        export DOCKER_CONFIG
+        mkdir -p "$DOCKER_CONFIG"
+        printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
+        echo '${{ inputs.github_token }}' | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+    - name: 'Rolling-Deployment: ${{ inputs.image_tag }} → ${{ inputs.env_key }}'
+      shell: bash
+      env:
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        DEMO_BUG: ${{ inputs.demo_bug }}
+      run: deploy/scripts/deploy.sh ${{ inputs.env_key }}
+    - name: State & Ops-Event aktualisieren
+      shell: bash
+      run: |
+        deploy/scripts/state.sh set ${{ inputs.env_key }} \
+          current='${{ inputs.image_tag }}' current_version='${{ inputs.version }}'
+        if [ '${{ inputs.mark_green }}' = 'true' ]; then
+          # Ohne nachgelagertes Gate gilt: erfolgreich deployt = grün.
+          deploy/scripts/state.sh set ${{ inputs.env_key }} \
+            last_green='${{ inputs.image_tag }}' last_green_version='${{ inputs.version }}'
+          REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
+          for IMG in backend frontend e2e; do
+            docker tag "$REGISTRY/$IMG:${{ inputs.image_tag }}" "$REGISTRY/$IMG:green-${{ inputs.env_key }}" || true
+          done
+        fi
+        deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' '${{ inputs.image_tag }}' \
+          "$GITHUB_SHA" "$GITHUB_ACTOR" deployed '' \
+          "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+          '${{ inputs.version }}'

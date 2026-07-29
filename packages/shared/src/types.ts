@@ -41,6 +41,8 @@ export interface AppInfo {
   environment: AppEnvironment;
   buildTime: string;
   demoBug: DemoBug;
+  /** Container-Hostname der antwortenden Instanz — macht Load-Balancing über mehrere Replicas sichtbar. */
+  instance: string;
 }
 
 export interface FieldError {

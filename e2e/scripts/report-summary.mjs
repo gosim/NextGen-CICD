@@ -15,6 +15,24 @@ function print(line) {
   process.stdout.write(`${line}\n`);
 }
 
+// Entfernt ANSI-Escape-Sequenzen (Farb-/Steuercodes) aus Playwright-Fehlermeldungen,
+// damit der Codeblock in der Step Summary sauber lesbar bleibt.
+function stripAnsi(text) {
+  // eslint-disable-next-line no-control-regex -- \x1b ist hier genau der Zweck
+  return String(text ?? '').replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
+}
+
+// Dateipfad auf den Basisnamen kürzen — hält die Zusammenfassung kompakt und
+// blendet Container-interne Pfade (/repo/e2e/…) aus.
+function baseName(file) {
+  return String(file ?? '').split(/[\\/]/).pop() ?? '';
+}
+
+// Millisekunden → "3,2s" (deutsche Dezimalschreibweise, eine Nachkommastelle).
+function formatDuration(ms) {
+  return `${(Number(ms ?? 0) / 1000).toFixed(1).replace('.', ',')}s`;
+}
+
 // Playwright-JSON-Reporter: suites sind rekursiv verschachtelt, jede enthält specs,
 // jeder spec enthält tests mit einem Statusfeld ('expected'|'unexpected'|'flaky'|'skipped').
 function collectTests(suite, acc) {
@@ -24,12 +42,56 @@ function collectTests(suite, acc) {
       if (test.projectName === 'setup') {
         continue;
       }
-      acc.push({ title: spec.title, status: test.status });
+      // spec.file/spec.line dienen als Fallback-Ort, results[] tragen die
+      // Attempt-Historie (Status/Dauer/Fehler) für die Detail-Blöcke.
+      acc.push({
+        title: spec.title,
+        status: test.status,
+        file: spec.file,
+        line: spec.line,
+        results: test.results ?? [],
+      });
     }
   }
   for (const child of suite.suites ?? []) {
     collectTests(child, acc);
   }
+}
+
+// Baut den aufklappbaren Detail-Block für einen fehlgeschlagenen oder flaky Test:
+// bereinigte Fehlermeldung (max. ~15 Zeilen) plus Attempt-Verlauf.
+function renderDetails(test, emoji) {
+  const attempts = test.results ?? [];
+  // Fehlerdetails aus dem letzten Attempt mit Fehler — final failure beim
+  // fehlgeschlagenen, die instabile Ausführung beim flaky Test.
+  const failing = [...attempts].reverse().find((result) => result.error?.message);
+  const location = failing?.error?.location ?? { file: test.file, line: test.line };
+  const where = `${baseName(location?.file)}${location?.line ? `:${location.line}` : ''}`;
+
+  // Fehlermeldung bereinigen und auf die ersten ~15 Zeilen kürzen.
+  const rawMessage = failing?.error?.message ?? 'Keine Fehlermeldung im Report.';
+  const messageLines = stripAnsi(rawMessage).split('\n');
+  const trimmed = messageLines.slice(0, 15);
+  if (messageLines.length > trimmed.length) {
+    trimmed.push('… (gekürzt)');
+  }
+
+  // Attempt-Verlauf: "1. failed (3,2s) → 2. passed (1,1s)".
+  const attemptsLine = attempts
+    .map((result, index) => `${index + 1}. ${result.status} (${formatDuration(result.duration)})`)
+    .join(' → ');
+
+  return [
+    `<details><summary>${emoji} ${test.title} (${where}, ${attempts.length} Versuche)</summary>`,
+    '',
+    '```',
+    ...trimmed,
+    '```',
+    '',
+    `Versuche: ${attemptsLine}`,
+    '</details>',
+    '',
+  ];
 }
 
 function run() {
@@ -58,8 +120,10 @@ function run() {
   const skipped = withStatus('skipped').length;
   const total = tests.length;
 
-  const flakyNames = withStatus('flaky').map((test) => test.title);
-  const failedNames = withStatus('unexpected').map((test) => test.title);
+  const flakyTests = withStatus('flaky');
+  const failedTests = withStatus('unexpected');
+  const flakyNames = flakyTests.map((test) => test.title);
+  const failedNames = failedTests.map((test) => test.title);
 
   const lines = [
     '## Playwright E2E — Zusammenfassung',
@@ -69,6 +133,13 @@ function run() {
     `| ${total} | ${passed} | ${failed} | ${flaky} | ${skipped} |`,
     '',
   ];
+
+  // Report-Link direkt unter der Tabelle — nur wenn der Publish eine URL geliefert
+  // hat (REPORT_URL bleibt leer, falls der gh-pages-Publish übersprungen wurde).
+  const reportUrl = (process.env.REPORT_URL ?? '').trim();
+  if (reportUrl) {
+    lines.push(`📄 [Vollständiger Playwright-Report](${reportUrl})`, '');
+  }
 
   if (flaky > 0) {
     lines.push(
@@ -88,6 +159,18 @@ function run() {
       lines.push(`> - ${name}`);
     }
     lines.push('');
+  }
+
+  // Aufklappbare Detail-Blöcke je fehlgeschlagenem/flaky Test: bereinigte
+  // Fehlermeldung als Codeblock plus Attempt-Verlauf (Status/Dauer pro Versuch).
+  if (failedTests.length > 0 || flakyTests.length > 0) {
+    lines.push('### Fehlerdetails', '');
+    for (const test of failedTests) {
+      lines.push(...renderDetails(test, '❌'));
+    }
+    for (const test of flakyTests) {
+      lines.push(...renderDetails(test, '⚠️'));
+    }
   }
 
   const markdown = lines.join('\n');

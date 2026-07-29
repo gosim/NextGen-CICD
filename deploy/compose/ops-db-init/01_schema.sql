@@ -17,7 +17,9 @@ CREATE TABLE deployments (
   actor text NOT NULL DEFAULT '',
   status text NOT NULL,
   duration_seconds int,
-  run_url text NOT NULL DEFAULT ''
+  run_url text NOT NULL DEFAULT '',
+  -- Menschenlesbare Release-Version (z.B. package.json-Version); '' wenn unbekannt.
+  version text NOT NULL DEFAULT ''
 );
 
 -- Testlauf-Ergebnisse je Gate (inkl. flaky-Zahl — Kern des Flaky-Trends).
@@ -31,7 +33,14 @@ CREATE TABLE test_runs (
   failed int NOT NULL DEFAULT 0,
   flaky int NOT NULL DEFAULT 0,
   skipped int NOT NULL DEFAULT 0,
-  run_url text NOT NULL DEFAULT ''
+  run_url text NOT NULL DEFAULT '',
+  -- Herkunft des Laufs: 'gate' (Quality Gate der Pipeline) oder 'stability'
+  -- (stündliche Stabilitäts-Checks). Trennt Gate-Trend von Stabilitäts-Panels.
+  source text NOT NULL DEFAULT 'gate',
+  -- Direktlink zum Playwright-HTML-Report des Laufs; '' wenn keiner vorliegt.
+  report_url text NOT NULL DEFAULT '',
+  -- Getestete Release-Version; '' wenn unbekannt.
+  version text NOT NULL DEFAULT ''
 );
 
 -- Panels sortieren/filtern nach (env, time desc).

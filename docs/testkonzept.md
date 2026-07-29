@@ -18,9 +18,25 @@ Der entscheidende Unterschied zu vielen realen Setups: E2E-Tests laufen hier nic
 |---|---|---|---|---|
 | **INT** | `int-regression` | Volle Suite (8 Testfälle) | `@regression` | INT wird automatisch deployt, ohne menschliche Freigabe — hier will man das größtmögliche Sicherheitsnetz, weil hier die meisten Deployments passieren und Regressionen am billigsten zu fangen sind. |
 | **Abnahme** | `abnahme` | Kritische Geschäftsprozesse: Mitarbeiter anlegen, ändern, löschen, Anzeige | `@abnahme` | Abnahme ist die fachliche Freigabestufe mit Required Reviewer. Das Gate bildet bewusst nur die Prozesse ab, die für die Geschäftsentscheidung „freigeben oder nicht" zählen — nicht jede UI-Randbedingung, die schon auf INT geprüft wurde. |
-| **PROD** | `smoke` | Health + Sichtbarkeit, **rein lesend** | `@smoke` | PROD trägt echte (bzw. demo-„echte") Daten. Ein Gate, das hier schreibt, würde Produktivdaten verändern oder Testartefakte hinterlassen. Der Smoke-Test beweist ausschließlich: Die Umgebung läuft, die erwartete Version ist aktiv, die Kernseite lädt. |
+| **PROD** | — (kein Deployment-Gate) | Deployment ohne eigenes Gate | — | Was PROD erreicht, hat bereits INT-Regression und Abnahme-Gate byte-identisch überlebt — ein weiteres Gate würde nur wiederholen. Die `smoke`-Suite (`@smoke`, **rein lesend**) prüft PROD stattdessen **stündlich** im Stabilitäts-Check; Notfallhebel ist der manuelle Rollback-Workflow. |
 
 Alle drei Gates laufen mit `--grep-invert @quarantine` — quarantänisierte Tests können naturgemäß keines der drei Gates blockieren (siehe unten).
+
+## Die Pyramide auf einen Blick: Ebene ↔ Auslöser ↔ Gate
+
+| Ebene | Separiert durch | Auslöser | Gate-Wirkung |
+|---|---|---|---|
+| Unit + API (Basis) | eigene Packages (`apps/*`, Vitest/Supertest) | jeder Push/PR, **vor** jedem Image-Build | rot ⇒ es entsteht gar kein deploybares Artefakt |
+| INT-Tests | Playwright-Project `int-regression` (Tag `@regression`) | **Deployment auf Integration** (automatisch) | rot ⇒ automatischer Rollback, keine Promotion |
+| Abnahmetests | Playwright-Project `abnahme` (Tag `@abnahme`) | **Deployment auf Abnahme** (nach Freigabe) | rot ⇒ automatischer Rollback, PROD unerreichbar |
+| PROD-Smoke | Playwright-Project `smoke` (Tag `@smoke`, read-only) | **stündlich** via Stabilitäts-Check (kein Deployment-Gate auf PROD) | rot ⇒ Signal (Run + Grafana) |
+| Stabilitäts-Check | dieselben drei Projects | **stündlich** (`stability-check.yml`) gegen die laufenden Umgebungen | rot ⇒ Signal (Run + Grafana), bewusst kein Rollback |
+
+Die Separierung ist bewusst **Tag-/Project-basiert** in einem gemeinsamen E2E-Package: ein Testfall kann mehreren Stufen angehören (z. B. „Mitarbeiter anlegen" in `@regression` **und** `@abnahme`), ohne Code-Duplikation; die Zugehörigkeit steht im Testtitel und ist damit im Report sofort sichtbar.
+
+## Stabilitäts-Monitoring (stündlich)
+
+`stability-check.yml` führt jede Stunde die Gate-Suiten gegen die **laufenden** Umgebungen aus — mit der jeweils deployten Version (aus dem State-File). Zweck: Gates beweisen Qualität *beim* Deployment, der Stability-Check beweist sie *zwischen* Deployments (Drift, schleichende Instabilität, Flakiness über Zeit). Ergebnisse landen mit `source='stability'` in der Ops-DB und als Bänder-Ansicht in Grafana. Ein roter Check löst **bewusst keinen Rollback** aus — es wurde nichts deployt; Instabilität im Betrieb ist eine Betriebs-Erkenntnis, kein Deployment-Fehler. Hinweise: INT/Abnahme-Checks setzen die Seed-Baseline zurück (gewollt auf Testumgebungen); ist der Mac offline, stauen sich die Läufe und nur der neueste wird ausgeführt (`concurrency: cancel-in-progress`).
 
 ## Flaky-Strategie
 

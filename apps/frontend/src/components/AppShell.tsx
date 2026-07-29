@@ -19,7 +19,7 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
           <Title order={3}>Stammdatenverwaltung</Title>
           <Group gap="sm" wrap="nowrap">
             <EnvBadge environment={info?.environment} demoBug={info?.demoBug} />
-            <VersionBadge version={info?.version} gitSha={info?.gitSha} />
+            <VersionBadge version={info?.version} gitSha={info?.gitSha} instance={info?.instance} />
           </Group>
         </Group>
       </AppShell.Header>

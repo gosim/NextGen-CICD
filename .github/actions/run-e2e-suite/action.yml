@@ -1,0 +1,176 @@
+name: 'E2E-Suite ausführen'
+description: >-
+  Führt eine Playwright-Suite im Container gegen eine deployte Umgebung aus und
+  kümmert sich um Report (Step Summary + GitHub Pages), Artifact und Ops-Event.
+  Der Playwright-Exit-Code wird gepuffert und erst im letzten Step scharf —
+  Reporting läuft dadurch garantiert auch bei roten Tests.
+
+inputs:
+  env_key:
+    description: 'Umgebungs-Kürzel: int | abnahme | prod'
+    required: true
+  frontend_port:
+    description: 'Host-Port des Frontends der Umgebung'
+    required: true
+  project:
+    description: 'Playwright-Project: int-regression | abnahme | smoke'
+    required: true
+  image_tag:
+    description: 'E2E-Image-Tag (sha-…)'
+    required: true
+  demo_flaky:
+    description: 'Flaky-Demo-Test aktivieren'
+    default: 'false'
+  source:
+    description: 'Auslöser: gate | stability (landet in der Ops-DB)'
+    default: 'gate'
+  version:
+    description: 'Menschenlesbare Version (v1.0.N) für Ops-Event/Anzeige'
+    default: ''
+  github_token:
+    description: 'Token für GHCR-Pull und gh-pages-Push'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Keychain-freie Docker-Config — im LaunchAgent-Kontext des Runners ist
+    # Keychain-Zugriff verboten; Muster identisch zu _deploy.yml.
+    - name: GHCR-Login (Keychain-frei)
+      shell: bash
+      run: |
+        DOCKER_CONFIG="$RUNNER_TEMP/docker-config"
+        echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
+        export DOCKER_CONFIG
+        mkdir -p "$DOCKER_CONFIG"
+        printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
+        echo '${{ inputs.github_token }}' | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+    - name: 'E2E-Tests: ${{ inputs.project }} gegen ${{ inputs.env_key }}'
+      id: run
+      shell: bash
+      run: |
+        REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
+        OUT="$RUNNER_TEMP/e2e-out"
+        rm -rf "$OUT" && mkdir -p "$OUT/test-results" "$OUT/playwright-report"
+        echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+        set +e
+        docker run --rm \
+          -e BASE_URL='http://host.docker.internal:${{ inputs.frontend_port }}' \
+          -e RUN_ID="$GITHUB_RUN_ID" \
+          -e DEMO_FLAKY='${{ inputs.demo_flaky }}' \
+          -e CI=true \
+          -v "$OUT/test-results:/repo/e2e/test-results" \
+          -v "$OUT/playwright-report:/repo/e2e/playwright-report" \
+          "$REGISTRY/e2e:${{ inputs.image_tag }}" \
+          --project='${{ inputs.project }}'
+        EC=$?
+        set -e
+        echo "exit_code=$EC" >> "$GITHUB_OUTPUT"
+        echo "Playwright-Exit: $EC (Verdikt folgt am Ende — Reporting läuft zuerst)"
+
+    # Fail-safe: ein Fehler beim Publizieren darf das Gate-Ergebnis nie verfälschen.
+    - name: Report auf GitHub Pages veröffentlichen
+      id: pages
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: |
+        set +e
+        publish() {
+          set -e
+          OUT="$RUNNER_TEMP/e2e-out/playwright-report"
+          [ -f "$OUT/index.html" ] || { echo "Kein HTML-Report vorhanden — Publish übersprungen."; return 1; }
+          DEST="reports/${GITHUB_RUN_ID}-${{ inputs.env_key }}-${{ inputs.source }}-${GITHUB_RUN_ATTEMPT}"
+          WORK="$RUNNER_TEMP/gh-pages"
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          rm -rf "$WORK"
+          if ! git clone --quiet --depth 1 --branch gh-pages "$REPO_URL" "$WORK" 2>/dev/null; then
+            mkdir -p "$WORK"
+            git -C "$WORK" init --quiet
+            git -C "$WORK" checkout --quiet -b gh-pages
+            git -C "$WORK" remote add origin "$REPO_URL"
+          fi
+          git -C "$WORK" config user.name "nextgen-pipeline"
+          git -C "$WORK" config user.email "pipeline@users.noreply.github.com"
+          mkdir -p "$WORK/reports"
+          rm -rf "$WORK/$DEST"
+          cp -R "$OUT" "$WORK/$DEST"
+          # Retention: nur die letzten 30 Reports behalten (BSD-kompatibel, kein head -n -30)
+          cd "$WORK/reports"
+          TOTAL=$(ls -1 | wc -l | tr -d ' ')
+          if [ "$TOTAL" -gt 30 ]; then
+            ls -1 | sort | sed -n "1,$((TOTAL - 30))p" | while read -r OLD; do rm -rf "$OLD"; done
+          fi
+          # Index-Seite generieren (neueste zuerst)
+          {
+            echo '<!doctype html><meta charset="utf-8"><title>NextGen CICD — Testreports</title>'
+            echo '<style>body{font-family:system-ui;margin:2rem;max-width:720px}li{margin:.3rem 0}</style>'
+            echo '<h1>Playwright-Testreports</h1><ul>'
+            ls -1 | sort -r | while read -r DIR; do
+              echo "<li><a href=\"./${DIR}/\">${DIR}</a></li>"
+            done
+            echo '</ul>'
+          } > index.html
+          cd "$WORK"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen auf gh-pages."
+          else
+            git commit --quiet -m "Testreport ${DEST}"
+            git push --quiet origin gh-pages
+          fi
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          NAME="${GITHUB_REPOSITORY#*/}"
+          echo "report_url=https://${OWNER}.github.io/${NAME}/${DEST}/" >> "$GITHUB_OUTPUT"
+        }
+        publish || echo "::warning::Report-Publish nach gh-pages fehlgeschlagen — Gate-Ergebnis unbeeinflusst."
+        exit 0
+
+    - name: Testreport-Zusammenfassung (inkl. Flaky-Warnung und Fehlerdetails)
+      id: summary
+      shell: bash
+      run: |
+        REGISTRY='${{ steps.run.outputs.registry }}'
+        OUT="$RUNNER_TEMP/e2e-out"
+        if [ ! -f "$OUT/test-results/results.json" ]; then
+          echo "Kein results.json vorhanden — Zusammenfassung übersprungen." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        docker run --rm --entrypoint node \
+          -e GITHUB_STEP_SUMMARY=/ghs -e GITHUB_OUTPUT=/gho \
+          -e REPORT_URL='${{ steps.pages.outputs.report_url }}' \
+          -v "$GITHUB_STEP_SUMMARY:/ghs" -v "$GITHUB_OUTPUT:/gho" \
+          -v "$OUT/test-results:/repo/e2e/test-results" \
+          "$REGISTRY/e2e:${{ inputs.image_tag }}" \
+          scripts/report-summary.mjs
+
+    - name: Roh-Traces als Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-${{ inputs.env_key }}-${{ inputs.source }}-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          ${{ runner.temp }}/e2e-out/playwright-report
+          ${{ runner.temp }}/e2e-out/test-results
+        retention-days: 14
+        if-no-files-found: ignore
+
+    - name: Ops-Event Testlauf
+      shell: bash
+      run: |
+        deploy/scripts/ops-event.sh test_run '${{ inputs.env_key }}' '${{ inputs.project }}' \
+          "${{ steps.summary.outputs.total || 0 }}" "${{ steps.summary.outputs.passed || 0 }}" \
+          "${{ steps.summary.outputs.failed || 0 }}" "${{ steps.summary.outputs.flaky || 0 }}" \
+          "${{ steps.summary.outputs.skipped || 0 }}" \
+          "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+          '${{ inputs.source }}' '${{ steps.pages.outputs.report_url }}' '${{ inputs.version }}'
+
+    - name: Gate-Verdikt
+      shell: bash
+      run: |
+        EC='${{ steps.run.outputs.exit_code }}'
+        if [ "$EC" != "0" ]; then
+          echo "::error::E2E-Suite '${{ inputs.project }}' gegen ${{ inputs.env_key }} fehlgeschlagen (Exit $EC)."
+          exit "$EC"
+        fi
+        echo "✅ Suite '${{ inputs.project }}' gegen ${{ inputs.env_key }} bestanden."

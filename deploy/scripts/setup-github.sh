@@ -33,6 +33,17 @@ done
 
 echo "✅ Environments eingerichtet: integration (auto), abnahme + prod (manuelle Freigabe durch $USER_LOGIN)."
 echo "   Hinweis: 'Prevent self-review' bewusst NICHT aktiv — Solo-Demo braucht Selbst-Freigabe."
+echo "   Achtung: Required Reviewers brauchen im Free-Plan ein PUBLIC Repo."
+
+echo "── GitHub Pages für Testreports (Branch gh-pages)…"
+if ! gh api "repos/$REPO/pages" >/dev/null 2>&1; then
+  gh api --method POST "repos/$REPO/pages" \
+    -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
+    && echo "✅ Pages aktiviert." \
+    || echo "⚠️  Pages nicht aktivierbar — existiert der gh-pages-Branch schon? (Wird beim ersten Gate-Lauf angelegt; dieses Skript danach erneut ausführen.)"
+else
+  echo "✅ Pages bereits aktiv."
+fi
 
 if [ "${1:-}" = "runner" ]; then
   RUNNER_DIR="$HOME/actions-runner"

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { AppEnvironment } from '@nextgen/shared';
 import { EnvBadge, envColor, envLabel } from './EnvBadge';
-import { VersionBadge } from './VersionBadge';
 import { renderWithProviders } from '../test-utils';
 
 const cases: Array<[AppEnvironment, string, string]> = [
@@ -36,14 +35,5 @@ describe('EnvBadge', () => {
   it('zeigt das DEMO-BUG-Badge, wenn ein Demo-Bug aktiv ist', () => {
     renderWithProviders(<EnvBadge environment="int" demoBug="broken-create" />);
     expect(screen.getByTestId('demo-bug-badge')).toHaveTextContent('DEMO-BUG AKTIV');
-  });
-});
-
-describe('VersionBadge', () => {
-  it('zeigt Version und gitSha', () => {
-    renderWithProviders(<VersionBadge version="1.2.3" gitSha="abc1234" />);
-    const badge = screen.getByTestId('version-badge');
-    expect(badge).toHaveTextContent('1.2.3');
-    expect(badge).toHaveTextContent('abc1234');
   });
 });

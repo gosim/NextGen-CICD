@@ -91,6 +91,7 @@ DB-Zugang je Umgebung: User/DB `app`, Passwort im jeweiligen [deploy/env/*.env](
 | Grafana (anonymer Viewer) | http://localhost:8000 |
 | Haupt-Dashboard „NextGen CICD — Environments" | http://localhost:8000/d/nextgen-environments/ |
 | Editier-Login | `admin` / `admin` |
+| Portainer (Container-GUI, alle Stacks/Logs/Konsolen) | http://localhost:9000 — beim ersten Aufruf Admin-Passwort setzen |
 
 ### GitHub
 
@@ -100,6 +101,8 @@ DB-Zugang je Umgebung: User/DB `app`, Passwort im jeweiligen [deploy/env/*.env](
 | Actions (alle Läufe) | https://github.com/gosim/NextGen-CICD/actions |
 | Pipeline manuell starten (Demo-Inputs) | https://github.com/gosim/NextGen-CICD/actions/workflows/pipeline.yml |
 | Manueller Rollback | https://github.com/gosim/NextGen-CICD/actions/workflows/rollback-manual.yml |
+| Stabilitäts-Check (stündlich + manuell) | https://github.com/gosim/NextGen-CICD/actions/workflows/stability-check.yml |
+| Testreports (Playwright, GitHub Pages) | https://gosim.github.io/NextGen-CICD/ |
 | Environments-Übersicht („was läuft wo") | https://github.com/gosim/NextGen-CICD/deployments |
 | Environments-Einstellungen (Reviewer) | https://github.com/gosim/NextGen-CICD/settings/environments |
 | Self-hosted Runner | https://github.com/gosim/NextGen-CICD/settings/actions/runners |

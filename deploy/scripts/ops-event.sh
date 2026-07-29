@@ -6,10 +6,13 @@
 # verworfen und das Skript beendet sich trotzdem mit exit 0.
 #
 # Vertrag (wird von der Pipeline aufgerufen):
-#   ops-event.sh deployment <env> <image_tag> <git_sha> <actor> <status> [duration_seconds] [run_url]
-#   ops-event.sh test_run   <env> <suite> <total> <passed> <failed> <flaky> <skipped> [run_url]
+#   ops-event.sh deployment <env> <image_tag> <git_sha> <actor> <status> [duration_seconds] [run_url] [version]
+#   ops-event.sh test_run   <env> <suite> <total> <passed> <failed> <flaky> <skipped> [run_url] [source] [report_url] [version]
 #
 # status (deployments): deployed | promoted | rolled_back | failed
+# source  (test_runs):  gate (Default) | stability
+# Neue Parameter sind optional und ans Ende gehängt — bestehende Aufrufe ohne
+# sie bleiben unverändert gültig (rückwärtskompatibel).
 #
 # Bewusst set -u (unbound-Schutz), aber KEIN set -e: kein Fehler darf zum
 # Abbruch mit != 0 führen.
@@ -59,22 +62,24 @@ case "${kind}" in
     status="${6:-}"
     duration="${7:-}"
     run_url="${8:-}"
+    version="${9:-}"
     if [ -z "${env}" ] || [ -z "${image_tag}" ] || [ -z "${status}" ]; then
       warn 'deployment: env, image_tag und status sind Pflicht — Event verworfen'
       exit 0
     fi
     # NULLIF(...,'')::int -> leere Dauer wird zu SQL NULL statt Cast-Fehler.
     psql_insert \
-      "INSERT INTO deployments (env, image_tag, git_sha, actor, status, duration_seconds, run_url)
+      "INSERT INTO deployments (env, image_tag, git_sha, actor, status, duration_seconds, run_url, version)
        VALUES (:'env', :'image_tag', :'git_sha', :'actor', :'status',
-               NULLIF(:'duration', '')::int, :'run_url');" \
+               NULLIF(:'duration', '')::int, :'run_url', :'version');" \
       "env=${env}" \
       "image_tag=${image_tag}" \
       "git_sha=${git_sha}" \
       "actor=${actor}" \
       "status=${status}" \
       "duration=${duration}" \
-      "run_url=${run_url}" || exit 0
+      "run_url=${run_url}" \
+      "version=${version}" || exit 0
     ;;
   test_run)
     env="${2:-}"
@@ -85,20 +90,24 @@ case "${kind}" in
     flaky="${7:-}"
     skipped="${8:-}"
     run_url="${9:-}"
+    # source ohne Wert -> 'gate' (Default deckt sich mit der Spalten-Default).
+    source="${10:-gate}"
+    report_url="${11:-}"
+    version="${12:-}"
     if [ -z "${env}" ] || [ -z "${suite}" ]; then
       warn 'test_run: env und suite sind Pflicht — Event verworfen'
       exit 0
     fi
     # COALESCE(NULLIF(...,'')::int, 0) -> fehlende Zahl wird defensiv zu 0.
     psql_insert \
-      "INSERT INTO test_runs (env, suite, total, passed, failed, flaky, skipped, run_url)
+      "INSERT INTO test_runs (env, suite, total, passed, failed, flaky, skipped, run_url, source, report_url, version)
        VALUES (:'env', :'suite',
                COALESCE(NULLIF(:'total', '')::int, 0),
                COALESCE(NULLIF(:'passed', '')::int, 0),
                COALESCE(NULLIF(:'failed', '')::int, 0),
                COALESCE(NULLIF(:'flaky', '')::int, 0),
                COALESCE(NULLIF(:'skipped', '')::int, 0),
-               :'run_url');" \
+               :'run_url', :'source', :'report_url', :'version');" \
       "env=${env}" \
       "suite=${suite}" \
       "total=${total}" \
@@ -106,7 +115,10 @@ case "${kind}" in
       "failed=${failed}" \
       "flaky=${flaky}" \
       "skipped=${skipped}" \
-      "run_url=${run_url}" || exit 0
+      "run_url=${run_url}" \
+      "source=${source}" \
+      "report_url=${report_url}" \
+      "version=${version}" || exit 0
     ;;
   '')
     warn 'Kein Event-Typ angegeben — erwartet "deployment" oder "test_run"'

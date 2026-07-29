@@ -1,0 +1,69 @@
+# Stündlicher Stabilitäts-Check: führt die Gate-Suiten gegen die LAUFENDEN Umgebungen aus
+# (Synthetic Monitoring). Rot = Signal in Run + Grafana — bewusst KEIN Rollback, denn es
+# wurde nichts deployt; Instabilität zwischen Deployments ist eine Betriebs-Erkenntnis.
+name: Stabilitäts-Check
+
+on:
+  schedule:
+    # Stündlich zur vollen Stunde (UTC; GitHub kann sich um Minuten verspäten).
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write # gh-pages-Push der Testreports
+  packages: read
+
+# Wenn der Mac länger offline war, läuft nur der neueste aufgestaute Check.
+concurrency:
+  group: stability-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: '🔍 ${{ matrix.label }}'
+    runs-on: [self-hosted, macOS, deploy]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env_key: int
+            label: INT
+            frontend_port: '8001'
+            api_port: '3001'
+            project: int-regression
+          - env_key: abnahme
+            label: Abnahme
+            frontend_port: '8002'
+            api_port: '3002'
+            project: abnahme
+          - env_key: prod
+            label: PROD
+            frontend_port: '8003'
+            api_port: '3003'
+            project: smoke
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deployte Version ermitteln
+        id: state
+        run: |
+          TAG="$(deploy/scripts/state.sh get ${{ matrix.env_key }} current)"
+          [ -z "$TAG" ] && TAG="$(deploy/scripts/state.sh get ${{ matrix.env_key }} last_green)"
+          if [ -z "$TAG" ]; then
+            echo "::notice::${{ matrix.label }}: keine deployte Version bekannt — Check übersprungen."
+          fi
+          VERSION="$(curl -fsS --max-time 5 "http://localhost:${{ matrix.api_port }}/api/info" | jq -r '.version // empty' 2>/dev/null || true)"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Prüfe ${{ matrix.label }}: Version ${VERSION:-?} (${TAG:-—})"
+      - name: Suite gegen die laufende Umgebung ausführen
+        if: steps.state.outputs.tag != ''
+        uses: ./.github/actions/run-e2e-suite
+        with:
+          env_key: ${{ matrix.env_key }}
+          frontend_port: ${{ matrix.frontend_port }}
+          project: ${{ matrix.project }}
+          image_tag: ${{ steps.state.outputs.tag }}
+          source: stability
+          version: ${{ steps.state.outputs.version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

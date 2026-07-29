@@ -1,3 +1,4 @@
+import { hostname } from 'node:os';
 import { Router } from 'express';
 import type { AppInfo } from '@nextgen/shared';
 import type { Env } from '../config/env.js';
@@ -17,6 +18,7 @@ export function infoRouter(env: Env): Router {
       environment: env.APP_ENV,
       buildTime: env.BUILD_TIME,
       demoBug: env.DEMO_BUG,
+      instance: hostname(),
     };
     res.status(200).json(info);
   });

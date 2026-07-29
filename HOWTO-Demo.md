@@ -38,6 +38,8 @@ curl -fsS http://localhost:8000/api/health | jq -r .database
 | App INT | `http://localhost:8001` | Umgebungs-Badge blau „INT" |
 | App Abnahme | `http://localhost:8002` | Badge orange „ABNAHME" |
 | App PROD | `http://localhost:8003` | Badge grün „PROD" |
+| Portainer (optional) | `http://localhost:9000` | Container-GUI: alle Stacks, je 2 Replicas sichtbar, Live-Logs |
+| Testreports | `https://gosim.github.io/NextGen-CICD/` | Playwright-HTML-Reports aller Gate-/Stabilitäts-Läufe |
 | Terminal | Repo-Verzeichnis | für den Demo-Commit in Akt 1 |
 
 ### Graph lesen (wichtig für die Moderation)
@@ -58,7 +60,7 @@ GitHubs Actions-Graph ordnet Jobs strikt nach Abhängigkeit an — das ist nicht
    ```
 2. **Actions-Tab:** Der Run startet — erklären: Lint/Tests/Image-Build auf GitHub-Runnern („build once"), dann `deploy-int` **automatisch** auf dem self-hosted Runner.
 3. Wenn das INT-Gate läuft: erklären, dass hier echte Playwright-Tests **gegen die real deployte Umgebung** laufen — nicht gegen einen Mock. Danach im Job „Quality Gate" die **Step Summary** mit der Testtabelle zeigen.
-4. INT grün → der Run **pausiert** vor Abnahme. → **Environments-Tab**: `abnahme` wartet auf Review. Freigeben (Review deployments → abnahme → Approve). Gleiches Spiel später für PROD (dort läuft nur ein read-only Smoke-Test).
+4. INT grün → der Run **pausiert** vor Abnahme. → **Environments-Tab**: `abnahme` wartet auf Review. Freigeben (Review deployments → abnahme → Approve). Gleiches Spiel später für PROD — dort folgt nach der Freigabe nur noch der schlanke `🚀 Deploy`-Knoten (kein eigenes Gate; PROD wird stündlich vom Stabilitäts-Check read-only überwacht).
 5. **Zeigen:** App-Tabs — die neue Version (Badge mit neuer SHA) ist jetzt überall; Grafana-Historie hat drei neue Deploy-Events.
 
 **Kernbotschaft:** Promotion ist strukturell unmöglich ohne grünes Gate — und was auf PROD geht, ist byte-identisch das, was die Gates überlebt hat.
@@ -82,6 +84,11 @@ GitHubs Actions-Graph ordnet Jobs strikt nach Abhängigkeit an — das ist nicht
 3. **Zeigen:** Step Summary mit dem Warnblock „⚠️ 1 flaky Test(s) — bestanden erst im Retry" und dem Testnamen; in Grafana steigt der Flaky-Zähler.
 
 **Kernbotschaft:** Retries kaufen Zeit, sie heilen nichts. Flakiness wird gelb und laut — nicht rot und ignoriert, nicht grün und versteckt.
+
+### Zwischenspiel (optional, ~3 min) — Stabilität & Skalierung
+
+- **Stabilitäts-Check live:** Actions → „Stabilitäts-Check" → Run workflow. Drei Jobs (`🔍 INT/Abnahme/PROD`) prüfen die laufenden Umgebungen; in Grafana füllt sich die Reihe „Stabilität — stündliche Checks" (Bänder grün/gelb/rot) — derselbe Lauf startet sonst **stündlich automatisch**. Aus der „Letzter Check"-Tabelle direkt einen **Testreport öffnen** (klickbarer Link → Playwright-HTML-Report auf GitHub Pages).
+- **Load-Balancing zeigen:** zweimal `curl -s localhost:3001/api/info | jq -r .instance` — zwei verschiedene Container-Hostnamen (2 Replicas). Bei einem Deployment in Akt 1 lohnt der Hinweis: Der Wechsel lief **rolling** — alte und neue Version haben kurz parallel bedient, kein Request ging verloren.
 
 ### Akt 4 — Quarantäne & manueller Rollback (~5 min)
 
