@@ -1,0 +1,8 @@
+node_modules/
+dist/
+pnpm-lock.yaml
+playwright-report/
+blob-report/
+test-results/
+coverage/
+*.md
