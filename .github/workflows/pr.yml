@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   ci:
+    name: CI (PR)
     uses: ./.github/workflows/_ci.yml
     with:
       push_images: false

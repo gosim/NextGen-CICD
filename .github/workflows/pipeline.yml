@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   ci:
+    name: CI
     uses: ./.github/workflows/_ci.yml
     permissions:
       contents: read
@@ -35,6 +36,7 @@ jobs:
       push_images: true
 
   deploy-int:
+    name: INT
     uses: ./.github/workflows/_deploy.yml
     needs: ci
     permissions:
@@ -52,6 +54,7 @@ jobs:
       demo_bug: ${{ (inputs.demo_break_deploy && 'broken-create') || 'none' }}
 
   deploy-abnahme:
+    name: Abnahme
     uses: ./.github/workflows/_deploy.yml
     needs: [ci, deploy-int]
     permissions:
@@ -67,6 +70,7 @@ jobs:
       frontend_port: '8002'
 
   deploy-prod:
+    name: PROD
     uses: ./.github/workflows/_deploy.yml
     needs: [ci, deploy-abnahme]
     permissions:

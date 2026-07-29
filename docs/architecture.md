@@ -82,39 +82,33 @@ Der Ops-Stack ist bewusst ein eigenständiges, viertes Compose-Projekt und kein 
 
 ## Pipeline-Flow
 
-Ein Push auf `main` durchläuft CI einmal und wandert dann als **dasselbe** Image durch alle drei Umgebungen. Jede Umgebungsstufe folgt demselben Muster: Backup → Deploy → Gate → Promote (bei grün) oder Rollback (bei rot). Zwischen Integration und Abnahme sowie zwischen Abnahme und PROD steht eine manuelle GitHub-Environment-Freigabe.
+Ein Push auf `main` durchläuft CI einmal und wandert dann als **dasselbe** Image durch alle drei Umgebungen. In CI laufen Tests und Image-Builds **parallel** (deployt wird nur, wenn beides grün ist). Jede Umgebungsstufe besteht aus drei sichtbaren Stationen: **🚀 Deploy** (inkl. `last_green`-Lesen und pg_dump-Backup), **🛡 Quality Gate** (E2E-Tests, bei grün direkt inkl. Promote) und **⛑ Rollback** (nur bei Rot oder Abbruch). Zwischen Integration und Abnahme sowie zwischen Abnahme und PROD steht eine manuelle GitHub-Environment-Freigabe.
 
 ```mermaid
 flowchart TD
-    PUSH(["push main"]) --> CI["CI (_ci.yml, ubuntu-latest)<br/>Lint · Typecheck · Unit-/API-Tests<br/>Build & Push Images (sha-Tag)"]
+    PUSH(["push main"]) --> CI["CI (ubuntu-latest)<br/>🧪 Lint & Tests ∥ 📦 3× Image-Build (arm64)"]
 
-    CI --> P1["INT · prepare<br/>last_green lesen + pg_dump-Backup"]
-    P1 --> D1["INT · deploy<br/>compose up --wait inkl. migrate"]
-    D1 --> G1{"INT · Gate<br/>@regression"}
-    G1 -- grün --> PR1["INT · promote<br/>last_green = sha"]
-    G1 -- rot --> RB1["INT · Rollback<br/>DB-Restore + last_green redeploy"]
+    CI --> D1["INT · 🚀 Deploy<br/>Backup → compose up --wait inkl. migrate"]
+    D1 --> G1{"INT · 🛡 Quality Gate<br/>@regression"}
+    G1 -- "grün (inkl. Promote: last_green = sha)" --> APP1{{"⏸ Approval Abnahme"}}
+    G1 -- rot --> RB1["INT · ⛑ Rollback<br/>DB-Restore + last_green redeploy"]
 
-    PR1 --> APP1{{"⏸ Approval Abnahme"}}
-    APP1 --> P2["Abnahme · prepare"]
-    P2 --> D2["Abnahme · deploy"]
-    D2 --> G2{"Abnahme · Gate<br/>@abnahme"}
-    G2 -- grün --> PR2["Abnahme · promote"]
-    G2 -- rot --> RB2["Abnahme · Rollback"]
+    APP1 --> D2["Abnahme · 🚀 Deploy"]
+    D2 --> G2{"Abnahme · 🛡 Quality Gate<br/>@abnahme"}
+    G2 -- grün --> APP2{{"⏸ Approval PROD"}}
+    G2 -- rot --> RB2["Abnahme · ⛑ Rollback"]
 
-    PR2 --> APP2{{"⏸ Approval PROD"}}
-    APP2 --> P3["PROD · prepare"]
-    P3 --> D3["PROD · deploy"]
-    D3 --> G3{"PROD · Gate<br/>@smoke (read-only)"}
-    G3 -- grün --> PR3["PROD · promote"]
-    G3 -- rot --> RB3["PROD · Rollback"]
+    APP2 --> D3["PROD · 🚀 Deploy"]
+    D3 --> G3{"PROD · 🛡 Quality Gate<br/>@smoke (read-only)"}
+    G3 -- grün --> ENDE2(["Alle drei Umgebungen grün<br/>auf identischem Image"])
+    G3 -- rot --> RB3["PROD · ⛑ Rollback"]
 
     RB1 -.-> ENDE(["Workflow-Run: rot<br/>Umgebung: grün"])
     RB2 -.-> ENDE
     RB3 -.-> ENDE
-    PR3 -.-> ENDE2(["Alle drei Umgebungen grün<br/>auf identischem Image"])
 ```
 
-Technisch ist das in drei Workflows abgebildet: `pipeline.yml` (Orchestrierung, `push main` + `workflow_dispatch` mit Demo-Inputs) ruft `_ci.yml` als reusable Workflow und verkettet drei Aufrufe von `_deploy.yml` über `needs: [ci, deploy-<vorstufe>]`. `_deploy.yml` selbst besteht aus den Jobs `prepare → deploy → gate → promote`, plus `rollback` mit `if: failure()` auf denselben drei Vorgänger-Jobs. Weil `promote` und `rollback` beide von `gate` abhängen und sich gegenseitig über Erfolg/Fehlschlag ausschließen, ist es strukturell unmöglich, dass eine Version ohne bestandenes Gate promoted wird.
+Technisch ist das in drei Workflows abgebildet: `pipeline.yml` (Orchestrierung, `push main` + `workflow_dispatch` mit Demo-Inputs) ruft `_ci.yml` als reusable Workflow und verkettet drei Aufrufe von `_deploy.yml` über `needs: [ci, deploy-<vorstufe>]`; die Aufrufer-Jobs heißen `CI`, `INT`, `Abnahme`, `PROD` und gruppieren den Actions-Graphen in saubere Spalten. `_deploy.yml` besteht aus `deploy → gate` plus `rollback` mit `if: failure() || cancelled()`. Die Promote-Schritte sind die letzten Steps des Gate-Jobs — sie werden nur erreicht, wenn alle Tests davor grün waren. Damit ist es strukturell unmöglich, dass eine Version ohne bestandenes Gate promoted wird.
 
 ## Build once, deploy many
 
@@ -144,7 +138,7 @@ Schlägt das Gate fehl, übernimmt der `rollback`-Job in `_deploy.yml` (identisc
 
 1. **Backend stoppen** (`docker compose stop backend`) — unterbindet neue DB-Connections, bevor irgendetwas an der Datenbank verändert wird.
 2. **`pg_terminate_backend`** für alle verbleibenden Connections zur Datenbank `app` (außer der eigenen Restore-Session) — ohne diesen Schritt lehnt Postgres den Restore mit „database is being accessed by other users" ab.
-3. **`pg_restore --clean --if-exists`** aus dem Pre-Deploy-Backup (`~/deployments/backups/<env>/<timestamp>_<sha>.dump`, das `prepare` **vor** dem fehlgeschlagenen Deploy angelegt hat) — `--clean --if-exists` räumt vorhandene Objekte idempotent weg, bevor sie neu eingespielt werden.
+3. **`pg_restore --clean --if-exists`** aus dem Pre-Deploy-Backup (`~/deployments/backups/<env>/<timestamp>_<sha>.dump`, das der Deploy-Job **vor** dem fehlerhaften Ausrollen angelegt hat) — `--clean --if-exists` räumt vorhandene Objekte idempotent weg, bevor sie neu eingespielt werden.
 4. **`compose up` mit `last_green`** als `IMAGE_TAG` — das Image liegt lokal im Cache (gepinnt über einen zusätzlichen `green-<env>`-Tag, der im `promote`-Job gesetzt wird, damit `docker prune` es nicht wegräumt), ein Registry-Pull ist nicht erforderlich. Anschließend Healthcheck-Wait wie bei jedem regulären Deploy.
 5. **State- und Sichtbarkeits-Update**: `state.sh set <env> current=<last_green>`, GitHub-Deployment-Status `failure` (der Workflow-Run bleibt rot — das ist gewollt: er transportiert die Information „hier gab es ein Problem"), Job-Summary mit Vorher/Nachher-Tabelle, Ops-Event `rolled_back` an die Ops-DB (erscheint in Grafana rot markiert).
 

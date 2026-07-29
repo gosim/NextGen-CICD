@@ -1,5 +1,7 @@
-# Reusable CI: Qualitätsprüfung + Image-Build (build once, deploy many).
+# Reusable CI: Qualitätsprüfung + Image-Builds (build once, deploy many).
 # Läuft IMMER auf GitHub-hosted Runnern — nie auf dem self-hosted Deploy-Runner (Sicherheit).
+# Tests und Image-Builds laufen PARALLEL (Wanduhrzeit ≈ max statt Summe); deployt wird
+# trotzdem nur, wenn der gesamte CI-Workflow grün ist (needs in pipeline.yml).
 name: CI (reusable)
 
 on:
@@ -12,12 +14,14 @@ on:
     outputs:
       image_tag:
         description: 'Unveränderlicher Image-Tag (sha-<shortsha>) für alle Umgebungen'
-        value: ${{ jobs.meta.outputs.image_tag }}
+        value: ${{ jobs.quality.outputs.image_tag }}
 
 jobs:
   quality:
-    name: Lint, Typecheck, Unit- & API-Tests
+    name: 🧪 Lint & Tests
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
     services:
       postgres:
         image: postgres:16-alpine
@@ -34,6 +38,9 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Versions-Metadaten berechnen
+        id: vars
+        run: echo "image_tag=sha-$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -52,28 +59,9 @@ jobs:
           TEST_DATABASE_URL: postgres://app:app@localhost:5432/app
         run: pnpm test
 
-  meta:
-    name: Versions-Metadaten
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.vars.outputs.image_tag }}
-      registry: ${{ steps.vars.outputs.registry }}
-      version: ${{ steps.vars.outputs.version }}
-      build_time: ${{ steps.vars.outputs.build_time }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: vars
-        run: |
-          SHORT_SHA="$(git rev-parse --short=7 HEAD)"
-          echo "image_tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "registry=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-          echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
   build-images:
-    name: 'Image: ${{ matrix.image }}'
+    name: '📦 Image: ${{ matrix.image }}'
     runs-on: ubuntu-latest
-    needs: [quality, meta]
     permissions:
       contents: read
       packages: write
@@ -88,6 +76,13 @@ jobs:
             dockerfile: e2e/Dockerfile
     steps:
       - uses: actions/checkout@v4
+      - name: Versions-Metadaten berechnen
+        id: vars
+        run: |
+          echo "image_tag=sha-$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "registry=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       # Deploy-Ziel ist ein Apple-Silicon-Mac: Images werden als linux/arm64
       # gebaut (QEMU-Emulation auf den amd64-GitHub-Runnern).
       - uses: docker/setup-qemu-action@v3
@@ -106,11 +101,11 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/arm64
           push: ${{ inputs.push_images }}
-          tags: ${{ needs.meta.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
+          tags: ${{ steps.vars.outputs.registry }}/${{ matrix.image }}:${{ steps.vars.outputs.image_tag }}
           build-args: |
-            APP_VERSION=${{ needs.meta.outputs.version }}
-            GIT_SHA=${{ needs.meta.outputs.image_tag }}
-            BUILD_TIME=${{ needs.meta.outputs.build_time }}
+            APP_VERSION=${{ steps.vars.outputs.version }}
+            GIT_SHA=${{ steps.vars.outputs.image_tag }}
+            BUILD_TIME=${{ steps.vars.outputs.build_time }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
           labels: |

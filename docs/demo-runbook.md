@@ -22,7 +22,7 @@ Drehbuch für die Live-Präsentation vor Enterprise-Teilnehmern. Vier Akte, ca. 
 
 1. Eine harmlose, sichtbare Änderung machen (z. B. ein Textbaustein im Frontend-Header) und auf `main` pushen.
 2. Im Actions-Tab den neuen „Pipeline"-Run öffnen. Kurz erklären: `ci`-Job baut auf `ubuntu-latest` — Lint, Typecheck, Tests, dann Image-Build + Push nach GHCR mit dem `sha-`-Tag dieses Commits.
-3. `deploy-int` läuft automatisch an (kein Approval für Integration). Beobachten: `prepare` (Backup) → `deploy` → `gate` (`@regression`, 8 Testfälle) → `promote`.
+3. Die INT-Stufe läuft automatisch an (kein Approval für Integration). Beobachten: **🚀 Deploy** (erste Steps: Backup + last_green) → **🛡 Quality Gate** (`@regression`, 8 Testfälle; bei grün laufen am Ende die Promote-Steps).
 4. Sobald `deploy-int` grün ist, wartet `deploy-abnahme` auf **Approval**. Im Run auf „Review deployments" klicken → Umgebung `abnahme` markieren → „Approve and deploy".
 5. Abnahme-Gate (`@abnahme`) läuft durch → `promote`.
 6. Gleiches Spiel für PROD: Approval erteilen → `smoke`-Gate (read-only) → `promote`.
@@ -38,7 +38,7 @@ Drehbuch für die Live-Präsentation vor Enterprise-Teilnehmern. Vier Akte, ca. 
 1. Actions → Workflow „Pipeline" → „Run workflow" → Branch `main`.
 2. Input `demo_break_deploy` auf `true` setzen, `demo_flaky` auf `false` lassen → „Run workflow".
 3. **Kurz erklären, bevor der Lauf durch ist**: Es wird kein neuer, kaputter Code committet — `demo_break_deploy=true` setzt zur Laufzeit `DEMO_BUG=broken-create` auf dem Backend-Container der INT-Umgebung. Dieses Flag lässt `POST /api/mitarbeiter` mit `500 INTERNAL` fehlschlagen (sichtbar auch über `GET /api/info` → `demoBug`). Das simuliert einen Bug, der erst nach dem Deploy in der echten Umgebung auffällt — genau der Fall, den ein CI-only-Test nie findet.
-4. `ci` läuft normal durch (der Bug ist ein Laufzeit-Flag, kein Build-Defekt). `deploy-int`: `prepare` (Backup **vor** dem fehlerhaften Deploy!) → `deploy` (Stack läuft jetzt mit `DEMO_BUG=broken-create`) → `gate`: der Testfall „Anlegen" schlägt fehl → **Gate rot**.
+4. `CI` läuft normal durch (der Bug ist ein Laufzeit-Flag, kein Build-Defekt). INT-Stufe: **🚀 Deploy** (Backup **vor** dem fehlerhaften Ausrollen!) → Stack läuft jetzt mit `DEMO_BUG=broken-create` → **🛡 Quality Gate**: der Testfall „Anlegen" schlägt fehl → **Gate rot**.
 5. Der `rollback`-Job springt automatisch an: DB-Restore aus dem eben erstellten Pre-Deploy-Backup, danach Redeploy auf `last_green`.
 6. **Beweis führen**: Workflow-Run zeigt ein rotes ✕ — aber `http://localhost:8001` im Browser öffnen und zeigen: Die Anwendung läuft weiter, das Versions-Badge zeigt die **alte**, funktionierende SHA, nicht die kaputte. „Anlegen" funktioniert dort wieder normal.
 7. Grafana: In der Deployment-Historie erscheint der neue Eintrag **rot markiert** als `rolled_back`.

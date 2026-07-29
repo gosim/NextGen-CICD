@@ -59,7 +59,7 @@ curl -fsS http://localhost:8000/api/health | jq -r .database
 
 1. **Actions → Pipeline → Run workflow** → Haken bei **`demo_break_deploy`** → Run workflow. Erklären: Das simuliert einen Bug — `POST /api/mitarbeiter` liefert 500 (im UI: `DEMO-BUG AKTIV`-Badge auf INT nach dem Deploy).
 2. Live verfolgen: Deploy auf INT läuft durch (die App startet ja — der Bug zeigt sich erst funktional!), dann wird das **Gate rot** (Test „Mitarbeiter anlegen" schlägt fehl).
-3. **Der Moment:** Der Job **„⛑ Automatischer Rollback"** springt an — er stellt die Datenbank aus dem Pre-Deploy-Backup wieder her und deployt die letzte grüne Version.
+3. **Der Moment:** Der Job **„INT / ⛑ Rollback"** springt an — er stellt die Datenbank aus dem Pre-Deploy-Backup wieder her und deployt die letzte grüne Version.
 4. **Beweis führen:**
    - App INT (`:8001`) neu laden → altes Badge, kein Demo-Bug-Badge, Anlegen funktioniert
    - Workflow-Run ist **rot** (das Signal!), die **Umgebung ist grün** — genau andersherum als im Ist-Zustand vieler Projekte

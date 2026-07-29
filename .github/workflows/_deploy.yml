@@ -1,6 +1,10 @@
-# Reusable Deploy: Backup → Deploy → Quality Gate → Promote | automatischer Rollback.
+# Reusable Deploy: 🚀 Deploy (inkl. Backup) → 🛡 Quality Gate (inkl. Promote) → ⛑ Rollback.
 # Kernprinzip: Eine Version, die das Gate nicht besteht, bleibt NIE auf der Umgebung stehen —
 # der Workflow-Run wird rot (Signal), die Umgebung bleibt grün (letzte gute Version + DB-Restore).
+#
+# Job-Namen sind bewusst STATISCH (ohne ${{ }}): GitHub expandiert Expressions in Namen
+# übersprungener Jobs nicht — statische Namen halten den Graphen sauber. Details (Tag,
+# Testset) stehen in Step-Namen und der Step Summary.
 name: Deploy (reusable)
 
 on:
@@ -41,9 +45,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    name: 'Backup & State (${{ inputs.env_key }})'
+  deploy:
+    name: 🚀 Deploy
     runs-on: [self-hosted, macOS, deploy]
+    environment:
+      name: ${{ inputs.gh_environment }}
+      url: http://localhost:${{ inputs.frontend_port }}
+    permissions:
+      contents: read
+      packages: read
     outputs:
       last_green: ${{ steps.state.outputs.last_green }}
       backup_file: ${{ steps.backup.outputs.backup_file }}
@@ -63,19 +73,6 @@ jobs:
           if [ -n "$BACKUP_FILE" ]; then
             deploy/scripts/state.sh set ${{ inputs.env_key }} last_backup="$BACKUP_FILE"
           fi
-
-  deploy:
-    name: 'Deploy ${{ inputs.image_tag }} → ${{ inputs.env_key }}'
-    runs-on: [self-hosted, macOS, deploy]
-    needs: prepare
-    environment:
-      name: ${{ inputs.gh_environment }}
-      url: http://localhost:${{ inputs.frontend_port }}
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@v4
       # Eigene Docker-Config ohne Keychain-Credential-Helper: im LaunchAgent-Kontext
       # des Runners ist Keychain-Zugriff verboten ("User interaction is not allowed").
       # Export über GITHUB_ENV, damit alle Folge-Steps dieselbe Config nutzen
@@ -88,7 +85,7 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-      - name: Stack deployen (compose up --wait, inkl. Migrations-One-Shot)
+      - name: 'Stack deployen: ${{ inputs.image_tag }} → ${{ inputs.env_key }} (compose up --wait, inkl. Migration)'
         env:
           IMAGE_TAG: ${{ inputs.image_tag }}
           DEMO_BUG: ${{ inputs.demo_bug }}
@@ -101,7 +98,7 @@ jobs:
             '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
 
   gate:
-    name: 'Quality Gate: ${{ inputs.gate_project }}'
+    name: 🛡 Quality Gate
     runs-on: [self-hosted, macOS, deploy]
     needs: deploy
     steps:
@@ -116,7 +113,7 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           printf '{"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}' > "$DOCKER_CONFIG/config.json"
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-      - name: E2E-Tests gegen die deployte Umgebung (im Playwright-Container)
+      - name: 'E2E-Tests (${{ inputs.gate_project }}) gegen die deployte Umgebung'
         id: run
         run: |
           REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
@@ -170,14 +167,8 @@ jobs:
             "${{ steps.summary.outputs.failed || 0 }}" "${{ steps.summary.outputs.flaky || 0 }}" \
             "${{ steps.summary.outputs.skipped || 0 }}" \
             '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-
-  promote:
-    name: 'Promote: ${{ inputs.env_key }} ist grün'
-    runs-on: [self-hosted, macOS, deploy]
-    needs: [prepare, deploy, gate]
-    steps:
-      - uses: actions/checkout@v4
-      - name: last_green fortschreiben & Images gegen Prune pinnen
+      # ── Promote: nur erreicht, wenn alle Gate-Steps oben grün sind ────────────
+      - name: 'Promote: last_green fortschreiben & Images gegen Prune pinnen'
         run: |
           deploy/scripts/state.sh set ${{ inputs.env_key }} last_green='${{ inputs.image_tag }}'
           REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
@@ -186,13 +177,13 @@ jobs:
           done
           deploy/scripts/ops-event.sh deployment '${{ inputs.env_key }}' '${{ inputs.image_tag }}' \
             '${{ github.sha }}' '${{ github.actor }}' promoted '' \
-            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' || true
           echo "✅ **${{ inputs.env_key }}** ist grün auf \`${{ inputs.image_tag }}\` — Version als last_green markiert." >> "$GITHUB_STEP_SUMMARY"
 
   rollback:
-    name: '⛑ Automatischer Rollback (${{ inputs.env_key }})'
+    name: ⛑ Rollback
     runs-on: [self-hosted, macOS, deploy]
-    needs: [prepare, deploy, gate]
+    needs: [deploy, gate]
     # Auch bei cancelled(): bricht die Concurrency der Eltern-Pipeline einen Lauf
     # mitten in Deploy/Gate ab, stellt dieser Job die Umgebung trotzdem wieder her —
     # eine halb deployte Umgebung darf nie liegen bleiben.
@@ -213,8 +204,8 @@ jobs:
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
       - name: App-Version + Datenbank wiederherstellen
         run: |
-          LAST_GREEN='${{ needs.prepare.outputs.last_green }}'
-          BACKUP_FILE='${{ needs.prepare.outputs.backup_file }}'
+          LAST_GREEN='${{ needs.deploy.outputs.last_green }}'
+          BACKUP_FILE='${{ needs.deploy.outputs.backup_file }}'
           CURRENT="$(deploy/scripts/state.sh get ${{ inputs.env_key }} current)"
           if [ -z "$LAST_GREEN" ]; then
             if [ "$CURRENT" = '${{ inputs.image_tag }}' ]; then
