@@ -40,6 +40,14 @@ curl -fsS http://localhost:8000/api/health | jq -r .database
 | App PROD | `http://localhost:8003` | Badge grün „PROD" |
 | Terminal | Repo-Verzeichnis | für den Demo-Commit in Akt 1 |
 
+### Graph lesen (wichtig für die Moderation)
+
+GitHubs Actions-Graph ordnet Jobs strikt nach Abhängigkeit an — das ist nicht konfigurierbar, erzählt aber genau die richtige Geschichte:
+
+- **Graph (rechts): der Fluss.** Spalten = Reihenfolge: `CI → INT → Abnahme → PROD`. Innerhalb einer Umgebungs-Box läuft es von links nach rechts: `🚀 Deploy → 🛡 Quality Gate → ⛑ Rollback`. **Untereinander** stehen nur Jobs, die parallel laufen (die drei `📦 Image`-Builds in der CI-Box — ein schöner Nebensatz zur Parallelisierung).
+- **Job-Sidebar (links): die vertikale Sicht.** Dort stehen die drei Stationen jeder Umgebung untereinander, gruppiert nach INT/Abnahme/PROD — ideal, wenn du die Stufen stapelweise durchgehen willst.
+- **Tipp:** Akt 1 im Graph moderieren (der Fluss durch die Gates), Akt 2 mit der INT-Box im Graph (rotes Gate, **grüner** Rollback direkt daneben — das Bild des Tages) plus Sidebar für die Details.
+
 ## 3. Die vier Akte
 
 ### Akt 1 — Der Normalzustand: eine Änderung fließt durch alle Gates (~10 min)
