@@ -1,10 +1,13 @@
 # E2E-Test-Image. Build-Kontext = REPO-ROOT (docker build -f e2e/Dockerfile .).
 # Das offizielle Playwright-Image bringt Browser + passende System-Deps mit;
-# die Version MUSS zur @playwright/test-Version aus e2e/package.json passen.
-FROM mcr.microsoft.com/playwright:v1.49.1-noble
+# die Version MUSS zur @playwright/test-Version aus e2e/package.json passen
+# (deshalb ist sie dort EXAKT gepinnt, ohne ^).
+FROM mcr.microsoft.com/playwright:v1.62.0-noble
 
-# pnpm über corepack (in Node enthalten) bereitstellen.
-RUN corepack enable
+# pnpm über corepack bereitstellen. Corepack zuerst aktualisieren: die im
+# Playwright-Image gebündelte Version kennt die rotierten npm-Signaturschlüssel
+# nicht und schlägt sonst mit "Cannot find matching keyid" fehl.
+RUN npm install -g corepack@latest && corepack enable
 
 WORKDIR /repo
 

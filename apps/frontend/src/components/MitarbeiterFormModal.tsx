@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Group, Modal, Select, Stack, TextInput } from '@mantine/core';
+import { Alert, Button, Group, Modal, NativeSelect, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -182,15 +182,17 @@ export function MitarbeiterFormModal({ opened, mitarbeiter, onClose }: Mitarbeit
             error={fieldError('email')}
           />
 
-          <Select
+          {/* Native Selects: von Playwright per selectOption() bedienbar (Vertrag testids.md) */}
+          <NativeSelect
             label="Abteilung"
-            placeholder="Bitte wählen"
             withAsterisk
-            searchable
-            data={abteilungOptions}
+            data={[{ value: '', label: 'Bitte wählen' }, ...abteilungOptions]}
             data-testid={TESTIDS.fieldAbteilung}
-            value={form.values.abteilungId !== null ? String(form.values.abteilungId) : null}
-            onChange={(value) => form.setFieldValue('abteilungId', value ? Number(value) : null)}
+            value={form.values.abteilungId !== null ? String(form.values.abteilungId) : ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              form.setFieldValue('abteilungId', value ? Number(value) : null);
+            }}
             error={fieldError('abteilungId')}
           />
 
@@ -203,18 +205,17 @@ export function MitarbeiterFormModal({ opened, mitarbeiter, onClose }: Mitarbeit
               {...form.getInputProps('eintrittsdatum')}
               error={fieldError('eintrittsdatum')}
             />
-            <Select
+            <NativeSelect
               label="Status"
               withAsterisk
-              allowDeselect={false}
               data={[
                 { value: 'aktiv', label: 'Aktiv' },
                 { value: 'inaktiv', label: 'Inaktiv' },
               ]}
               data-testid={TESTIDS.fieldStatus}
               value={form.values.status}
-              onChange={(value) =>
-                form.setFieldValue('status', (value as MitarbeiterStatus | null) ?? 'aktiv')
+              onChange={(event) =>
+                form.setFieldValue('status', event.currentTarget.value as MitarbeiterStatus)
               }
               error={fieldError('status')}
             />

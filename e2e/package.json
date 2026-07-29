@@ -10,7 +10,7 @@
     "report-summary": "node scripts/report-summary.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.1",
+    "@playwright/test": "1.62.0",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
   }

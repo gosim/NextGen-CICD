@@ -15,7 +15,7 @@ PROJECT="nextgen-$ENV_NAME"
 
 [ -f "$ENV_FILE" ] || { echo "FEHLER: env-File fehlt: $ENV_FILE" >&2; exit 1; }
 
-echo "Deploye $IMAGE_TAG nach $ENV_NAME…" >&2
+echo "Deploye ${IMAGE_TAG} nach ${ENV_NAME}…" >&2
 
 # Pull best-effort: beim Rollback liegt das Image ggf. nur im lokalen Cache
 docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull --ignore-pull-failures >/dev/null 2>&1 || true

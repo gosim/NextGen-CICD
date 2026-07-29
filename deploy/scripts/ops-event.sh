@@ -23,7 +23,9 @@ warn() {
 
 # Führt den INSERT im Ops-DB-Container aus. Werte werden über psql-Variablen
 # (-v name=value) und :'name'-Quoting übergeben — psql escaped selbst,
-# dadurch SQL-Injection-sicher. Rückgabe != 0 signalisiert einen Fehlerpfad.
+# dadurch SQL-Injection-sicher. Wichtig: Das SQL geht über STDIN, denn bei
+# `psql -c` findet KEINE Variablen-Interpolation statt. Rückgabe != 0
+# signalisiert einen Fehlerpfad.
 psql_insert() {
   local sql="$1"
   shift
@@ -32,8 +34,8 @@ psql_insert() {
   for kv in "$@"; do
     args+=(-v "${kv}")
   done
-  if ! docker exec -i "${OPS_CONTAINER}" \
-    psql -U ops -d ops -q -v ON_ERROR_STOP=1 "${args[@]}" -c "${sql}" >/dev/null 2>&1; then
+  if ! printf '%s\n' "${sql}" | docker exec -i "${OPS_CONTAINER}" \
+    psql -U ops -d ops -q -v ON_ERROR_STOP=1 "${args[@]}" >/dev/null 2>&1; then
     warn 'Insert fehlgeschlagen — Event verworfen'
     return 1
   fi

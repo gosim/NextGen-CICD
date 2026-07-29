@@ -39,7 +39,7 @@ if [ "${1:-}" = "runner" ]; then
   if [ -f "$RUNNER_DIR/.runner" ]; then
     echo "── Runner bereits konfiguriert ($RUNNER_DIR) — überspringe Installation."
   else
-    echo "── Installiere self-hosted Runner nach $RUNNER_DIR…"
+    echo "── Installiere self-hosted Runner nach ${RUNNER_DIR}…"
     mkdir -p "$RUNNER_DIR"
     cd "$RUNNER_DIR"
     ARCH="arm64"
