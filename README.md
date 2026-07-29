@@ -72,14 +72,49 @@ gh workflow run rollback-manual.yml -f environment=int -f restore_db=true
 
 Alternativ über die GitHub-UI: Actions → „Pipeline" bzw. „Manueller Rollback" → „Run workflow".
 
-## Port-Tabelle
+## URLs & Zugänge auf einen Blick
 
-| Umgebung | Compose-Projekt | Frontend | API | Postgres |
-|---|---|---|---|---|
-| Integration | `nextgen-int` | 8001 | 3001 | 5401 |
-| Abnahme | `nextgen-abnahme` | 8002 | 3002 | 5402 |
-| PROD | `nextgen-prod` | 8003 | 3003 | 5403 |
-| Ops (Grafana) | `nextgen-ops` | 8000 | — | 5400 (ops-db) |
+### Anwendungen (lokal)
+
+| Umgebung | Frontend | API-Info | Health | Compose-Projekt | Postgres |
+|---|---|---|---|---|---|
+| Integration | http://localhost:8001 | http://localhost:3001/api/info | http://localhost:3001/api/health | `nextgen-int` | `localhost:5401` |
+| Abnahme | http://localhost:8002 | http://localhost:3002/api/info | http://localhost:3002/api/health | `nextgen-abnahme` | `localhost:5402` |
+| PROD | http://localhost:8003 | http://localhost:3003/api/info | http://localhost:3003/api/health | `nextgen-prod` | `localhost:5403` |
+
+DB-Zugang je Umgebung: User/DB `app`, Passwort im jeweiligen [deploy/env/*.env](deploy/env/). Ops-DB: `localhost:5400` (User/DB/Passwort `ops`).
+
+### Dashboard (Grafana)
+
+| Was | URL |
+|---|---|
+| Grafana (anonymer Viewer) | http://localhost:8000 |
+| Haupt-Dashboard „NextGen CICD — Environments" | http://localhost:8000/d/nextgen-environments/ |
+| Editier-Login | `admin` / `admin` |
+
+### GitHub
+
+| Was | URL |
+|---|---|
+| Repository | https://github.com/gosim/NextGen-CICD |
+| Actions (alle Läufe) | https://github.com/gosim/NextGen-CICD/actions |
+| Pipeline manuell starten (Demo-Inputs) | https://github.com/gosim/NextGen-CICD/actions/workflows/pipeline.yml |
+| Manueller Rollback | https://github.com/gosim/NextGen-CICD/actions/workflows/rollback-manual.yml |
+| Environments-Übersicht („was läuft wo") | https://github.com/gosim/NextGen-CICD/deployments |
+| Environments-Einstellungen (Reviewer) | https://github.com/gosim/NextGen-CICD/settings/environments |
+| Self-hosted Runner | https://github.com/gosim/NextGen-CICD/settings/actions/runners |
+
+### Artifact-Repository (GHCR)
+
+| Image | Web-Ansicht | Pull-Referenz |
+|---|---|---|
+| Backend | https://github.com/gosim/NextGen-CICD/pkgs/container/nextgen-cicd%2Fbackend | `ghcr.io/gosim/nextgen-cicd/backend:sha-<commit>` |
+| Frontend | https://github.com/gosim/NextGen-CICD/pkgs/container/nextgen-cicd%2Ffrontend | `ghcr.io/gosim/nextgen-cicd/frontend:sha-<commit>` |
+| E2E-Tests | https://github.com/gosim/NextGen-CICD/pkgs/container/nextgen-cicd%2Fe2e | `ghcr.io/gosim/nextgen-cicd/e2e:sha-<commit>` |
+
+Hinweis: Die Pakete sind aktuell **privat** (Sichtbarkeit wurde beim ersten Push aus dem damals privaten Repo geerbt) — die Web-Ansichten funktionieren im eingeloggten Browser; die Pipeline zieht sie per `GITHUB_TOKEN`. Öffentlich machen (optional, für die Demo nicht nötig): Paketseite → Package settings → Change visibility.
+
+Testreports/Traces der Quality Gates: als **Artifacts** am jeweiligen Actions-Lauf (14 Tage Retention). Lokale Wiederherstellungs-Ablagen (State, DB-Dumps, green-Pins): siehe [docs/architecture.md → Artefakt-Ablagen](docs/architecture.md).
 
 ## Demo-Szenarien (`workflow_dispatch`-Inputs)
 
