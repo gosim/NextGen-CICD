@@ -541,25 +541,22 @@ function syncFlowDots(flows) {
 // GHCR — IMAGE-STAPEL
 // --------------------------------------------------------------------------
 const GHCR_SLOTS = 3;
-const ENV_CHIP = { int: 'INT', abnahme: 'ABN', prod: 'PROD' };
-/** Zuletzt gerenderte Stapel-Spitze — Wechsel löst die Slide-Animation aus. */
+/** Zuletzt gerenderte Band-Spitze — Wechsel löst die Slide-Animation aus. */
 let lastRegistryTop = null;
 
 /**
- * Rendert den Image-Stapel (max. 3 Karten, oben = neueste).
- * Ändert sich images[0].version, rutscht eine neue Karte von oben ein,
- * die übrigen rücken nach (CSS-Keyframes). Je Karte: Versions-Badge +
- * Env-Chips für jede Umgebung, deren Version der Karten-Version entspricht.
+ * Rendert das horizontale Image-Band (max. 3 Karten, links = neueste).
+ * Ändert sich images[0].version, schiebt eine neue Karte von links ein,
+ * die übrigen rutschen nach rechts (CSS-Keyframes). Je Karte: nur der
+ * Versions-Badge (Ziffern-Farblogik) + ggf. das kompakte „LATEST ✓"-Band.
  */
 function renderRegistry(state) {
   const images = Array.isArray(state.registry?.images) ? state.registry.images.slice(0, GHCR_SLOTS) : [];
-  const environments = state.environments || {};
   const topVersion = images[0]?.version ?? null;
   const isNewTop = lastRegistryTop !== null && topVersion !== null && topVersion !== lastRegistryTop;
 
-  // „LATEST ✓"-Band auf der NEUESTEN promoteten Karte (Position im Stapel egal, da
-  // images[] bereits neueste-zuerst sortiert ist → erster Treffer = neueste). „NEU"
-  // dezent auf noch nicht promoteten Karten.
+  // „LATEST ✓"-Band auf der NEUESTEN promoteten Karte (Position im Band egal, da
+  // images[] bereits neueste-zuerst sortiert ist → erster Treffer = neueste).
   const latestPromotedIdx = images.findIndex((im) => im?.promoted === true);
 
   // Deploy-Lese-Hervorhebung: läuft ein <env>-pull, glüht die Karte, deren Version
@@ -571,13 +568,12 @@ function renderRegistry(state) {
   for (let i = 0; i < GHCR_SLOTS; i++) {
     const card = document.getElementById(`ghcr-card-${i}`);
     if (!card) continue;
-    fillGhcrCard(card, images[i], environments);
+    fillGhcrCard(card, images[i]);
     card.classList.toggle('is-latest', i === latestPromotedIdx);
-    card.classList.toggle('is-neu', !!images[i]?.version && images[i]?.promoted !== true);
     card.classList.toggle('pull-glow', pullActive && !!images[i]?.version && images[i].version === readVersion);
   }
 
-  // Stapel-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
+  // Band-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
   if (isNewTop && !prefersReducedMotion.matches) {
     for (let i = 0; i < GHCR_SLOTS; i++) {
       const card = document.getElementById(`ghcr-card-${i}`);
@@ -616,21 +612,16 @@ function renderGhcrGhost(state, images) {
   }
 }
 
-/** Füllt eine einzelne Stapel-Karte (oder markiert sie als leer/gestrichelt). */
-function fillGhcrCard(card, img, environments) {
+/** Füllt eine einzelne Band-Karte (oder markiert sie als leer/gestrichelt). */
+function fillGhcrCard(card, img) {
   const badgeBg = card.querySelector('.ghcr-badge-bg');
   const badgeTxt = card.querySelector('.ghcr-badge-txt');
-  const chips = card.querySelector('.ghcr-chips');
 
   if (!img || !img.version) {
     card.classList.add('empty');
     if (badgeTxt.textContent !== '–') badgeTxt.textContent = '–';
     badgeBg.style.fill = '';
     badgeTxt.style.fill = '';
-    if (chips.dataset.envs !== '') {
-      chips.dataset.envs = '';
-      chips.textContent = '';
-    }
     return;
   }
 
@@ -640,74 +631,58 @@ function fillGhcrCard(card, img, environments) {
   badgeTxt.style.fill = contrastText(color);
   const label = `v${img.version}`;
   if (badgeTxt.textContent !== label) badgeTxt.textContent = label;
-
-  // Env-Chips: jede Umgebung, deren Version dieser Karte entspricht → Drift sichtbar
-  const matching = ENVS.filter((e) => environments[e]?.version === img.version);
-  const want = matching.join(',');
-  if (chips.dataset.envs !== want) {
-    chips.dataset.envs = want;
-    chips.textContent = '';
-    matching.forEach((env, idx) => {
-      const g = svg('g', { class: `ghcr-chip chip-${env}`, transform: `translate(${12 + idx * 50},52)` });
-      g.appendChild(svg('rect', { x: '0', y: '0', width: '46', height: '24', rx: '12', class: 'ghcr-chip-bg' }));
-      const t = svg('text', { x: '23', y: '17', 'text-anchor': 'middle', class: 'ghcr-chip-txt' });
-      t.textContent = ENV_CHIP[env];
-      g.appendChild(t);
-      chips.appendChild(g);
-    });
-  }
 }
 
 // --------------------------------------------------------------------------
-// BACKUP-BANK — je Umgebung ein Dump-Stapel mittig unter seiner Env-Box
+// BACKUP-BANK — ein Block, drei Segmente (mittig unter je einer Env-Box)
 // --------------------------------------------------------------------------
 
 /**
- * Rendert die drei Dump-Stapel (backup-int / -abnahme / -prod) aus der v4-Datenform
+ * Rendert die drei Backup-Segmente (backup-int / -abnahme / -prod) aus der v4-Datenform
  * state.backups.<env> = { at, sizeBytes, tag, count } | null.
- * Je Stapel: sichtbare oberste Karte (Zeit via fmtTime, Größe in kB) + Anzahl-Badge
- * („×count"); null ⇒ gestrichelter Platzhalter „kein Backup".
- * Bei aktivem <env>-backup- ODER <env>-restore-Flow pulsiert der Stapelrahmen (.active);
- * bei restore zusätzlich rote Glut auf der sichtbaren Karte (.restoring, §3).
+ * Je Segment: Env-Titel, Zeit (fmtTime), Größe in kB, Anzahl-Badge („×count");
+ * null ⇒ gestrichelte Segment-Karte „kein Backup".
+ * Bei aktivem <env>-backup- ODER <env>-restore-Flow pulsiert die Segment-Karte (.active);
+ * bei restore zusätzlich rote Glut (.restoring, §3). Der Block-Rahmen bleibt neutral.
  */
 function renderBackups(state) {
   const backups = state.backups || {};
   const flows = new Set(state.choreography?.flows || []);
 
   ENVS.forEach((env) => {
-    const stack = el.map.querySelector(`[data-component="backup-${env}"]`);
-    if (!stack) return;
-    fillBackupStack(stack, backups[env]);
+    const seg = el.map.querySelector(`.backup-seg[data-component="backup-${env}"]`);
+    if (!seg) return;
+    fillBackupSegment(seg, backups[env]);
 
     const backupActive = flows.has(`${env}-backup`);
     const restoreActive = flows.has(`${env}-restore`);
-    stack.classList.toggle('active', backupActive || restoreActive);
-    stack.classList.toggle('restoring', restoreActive);
+    seg.classList.toggle('active', backupActive || restoreActive);
+    seg.classList.toggle('restoring', restoreActive);
   });
 }
 
-/** Füllt einen einzelnen Dump-Stapel (oder schaltet auf den Platzhalter „kein Backup"). */
-function fillBackupStack(stack, entry) {
+/** Füllt ein einzelnes Backup-Segment (oder schaltet auf „kein Backup" gestrichelt). */
+function fillBackupSegment(seg, entry) {
   const hasData = !!(entry && entry.at);
-  stack.classList.toggle('empty', !hasData);
+  seg.classList.toggle('empty', !hasData);
 
-  const timeTxt = stack.querySelector('.backup-time');
-  const sizeTxt = stack.querySelector('.backup-size');
-  const countTxt = stack.querySelector('.backup-count-txt');
+  const timeTxt = seg.querySelector('.backup-time');
+  const sizeTxt = seg.querySelector('.backup-size');
+  const countTxt = seg.querySelector('.backup-count-txt');
 
   if (!hasData) {
     if (timeTxt.textContent !== '—') timeTxt.textContent = '—';
     if (sizeTxt.textContent !== '') sizeTxt.textContent = '';
     if (countTxt.textContent !== '') countTxt.textContent = '';
-    stack.dataset.key = '';
+    seg.dataset.key = '';
     return;
   }
 
   const kb = Math.round((entry.sizeBytes || 0) / 1024);
   const count = entry.count || 0;
   const key = `${entry.at}|${entry.sizeBytes}|${count}`;
-  if (stack.dataset.key === key) return; // idempotent — nichts geändert
-  stack.dataset.key = key;
+  if (seg.dataset.key === key) return; // idempotent — nichts geändert
+  seg.dataset.key = key;
 
   timeTxt.textContent = fmtTime(entry.at);
   sizeTxt.textContent = `${kb.toLocaleString('de-DE')} kB`;

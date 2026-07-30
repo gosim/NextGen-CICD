@@ -631,10 +631,6 @@ body {
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
-.col-label.sub {
-  font-size: 12.5px;
-  letter-spacing: 1px;
-}
 
 /* Knoten (Boxen) */
 .node-box {
@@ -830,8 +826,7 @@ body {
   opacity: 0.5;
 }
 .ghcr-card.empty .ghcr-badge-bg,
-.ghcr-card.empty .ghcr-badge-txt,
-.ghcr-card.empty .ghcr-chips {
+.ghcr-card.empty .ghcr-badge-txt {
   display: none;
 }
 .ghcr-badge-bg {
@@ -843,18 +838,7 @@ body {
   font-weight: 800;
   letter-spacing: 0.3px;
 }
-.ghcr-chip-bg {
-  fill: rgba(138, 184, 255, 0.14);
-  stroke: rgba(138, 184, 255, 0.5);
-  stroke-width: 1;
-}
-.ghcr-chip-txt {
-  fill: #cfe0ff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-}
-/* Stapel-Spitze glüht während eines Rollback-Pulls (§3) */
+/* Band-Spitze (neueste Karte) glüht während eines Rollback-Pulls (§3) */
 .ghcr-card.glow .ghcr-card-bg {
   stroke: #ff8a97;
   stroke-width: 2.5;
@@ -866,7 +850,7 @@ body {
   stroke-width: 2.5;
   filter: drop-shadow(0 0 8px var(--run-glow));
 }
-/* Neue Spitze rutscht von oben ein, übrige rücken nach */
+/* Neue Karte schiebt von links ein, übrige rutschen nach rechts */
 .ghcr-card.card-enter {
   animation: ghcr-card-enter 0.5s ease both;
 }
@@ -874,8 +858,8 @@ body {
   animation: ghcr-card-shift 0.5s ease both;
 }
 
-/* Kompaktes „LATEST ✓"-Eckband oben rechts (Blau-Akzent — Grün bleibt Status).
-   Überlappt weder Versions-Badge (links) noch Env-Chips (unten). */
+/* Kompaktes „LATEST ✓"-Band (Blau-Akzent — Grün bleibt Status).
+   Überlappt den Versions-Badge (links) nicht. */
 .ghcr-ribbon {
   opacity: 0;
   transition: opacity 0.3s;
@@ -894,30 +878,8 @@ body {
   letter-spacing: 0.4px;
   text-transform: uppercase;
 }
-/* „NEU" dezent auf noch nicht promoteten Karten — gleiche Größe wie das Band */
-.ghcr-neu {
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.ghcr-card.is-neu .ghcr-neu {
-  opacity: 1;
-}
-.ghcr-neu-bg {
-  fill: rgba(138, 184, 255, 0.1);
-  stroke: rgba(138, 184, 255, 0.45);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
-}
-.ghcr-neu-txt {
-  fill: #9fb6da;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-/* Leere Slots tragen weder Band noch Label */
-.ghcr-card.empty .ghcr-ribbon,
-.ghcr-card.empty .ghcr-neu {
+/* Leere Slots tragen kein Band */
+.ghcr-card.empty .ghcr-ribbon {
   display: none;
 }
 
@@ -943,37 +905,43 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* ==================== Backup-Bank (Dump-Stapel je Umgebung) ==================== */
-/* Titelchen „Backup · <ENV>" über dem Stapel */
-.backup-title {
+/* ==================== Backup-Bank — ein Block, drei Segmente ==================== */
+/* Durchgehender, neutraler Block-Rahmen mit Titel; darin drei Segmente, getrennt
+   durch feine Vertikalen. Die Puls-/Restore-Hervorhebung trifft ausschließlich die
+   Segment-Karte der betroffenen Umgebung, der Block-Rahmen bleibt unverändert. */
+.backup-block-frame {
+  fill: rgba(16, 24, 42, 0.55);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+.backup-block-label {
+  fill: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+.backup-divider {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+/* Segment: Env-Titel, Zeit, Größe, Anzahl-Badge — mittig unter der Env-Box */
+.backup-seg {
+  transition: filter 0.25s;
+}
+.backup-seg-card {
+  fill: var(--panel);
+  stroke: var(--border);
+  stroke-width: 1.5;
+  transition: stroke 0.25s;
+}
+.backup-seg-title {
   fill: var(--muted);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-}
-/* Aktiver Stapel: kein Skalieren des gesamten Blocks — nur die Karte pulsiert */
-.backup-bank.comp.active {
-  animation: none;
-  filter: none;
-}
-
-/* Angedeutete versetzte Karten hinter der sichtbaren Karte */
-.backup-shadow {
-  fill: var(--panel-2);
-  stroke: var(--border);
-  stroke-width: 1.5;
-  opacity: 0.55;
-}
-.backup-shadow.s2 {
-  opacity: 0.32;
-}
-
-/* Sichtbare oberste Karte */
-.backup-top-bg {
-  fill: var(--panel);
-  stroke: var(--border);
-  stroke-width: 1.5;
 }
 .backup-time {
   fill: var(--text);
@@ -989,7 +957,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Anzahl-Badge „×count" oben rechts */
+/* Anzahl-Badge „×count" oben rechts im Segment */
 .backup-count-bg {
   fill: rgba(138, 184, 255, 0.14);
   stroke: rgba(138, 184, 255, 0.5);
@@ -1003,49 +971,39 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Platzhalter, wenn (noch) keine Sicherung existiert (backups.<env> === null) */
-.backup-placeholder {
-  display: none;
-}
-.backup-bank.empty .backup-placeholder {
-  display: block;
-}
-.backup-bank.empty .backup-card,
-.backup-bank.empty .backup-shadow,
-.backup-bank.empty .backup-count {
-  display: none;
-}
-.backup-ph-bg {
-  fill: transparent;
-  stroke: var(--border-soft);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 5;
-  opacity: 0.65;
-}
+/* Platzhalter, wenn (noch) keine Sicherung existiert (backups.<env> === null):
+   Segment-Karte wird gestrichelt, „kein Backup" erscheint mittig. */
 .backup-ph-txt {
   fill: var(--muted-2);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.3px;
+  display: none;
+}
+.backup-seg.empty .backup-ph-txt {
+  display: block;
+}
+.backup-seg.empty .backup-seg-body,
+.backup-seg.empty .backup-count {
+  display: none;
+}
+.backup-seg.empty .backup-seg-card {
+  fill: transparent;
+  stroke: var(--border-soft);
+  stroke-dasharray: 6 5;
+  opacity: 0.65;
 }
 
-/* Puls des Stapels bei aktivem <env>-backup ODER <env>-restore */
-.backup-bank.comp.active .backup-top-bg {
+/* Puls der Segment-Karte bei aktivem <env>-backup ODER <env>-restore */
+.backup-seg.active .backup-seg-card {
   stroke: #6ea0ff;
   stroke-width: 2.5;
-}
-.backup-bank.comp.active .backup-card {
-  transform-box: fill-box;
-  transform-origin: center;
   animation: backup-pulse 1.2s ease-in-out infinite;
 }
-/* Restore: rote Glut auf der sichtbaren Karte (überschreibt den blauen Puls —
+/* Restore: rote Glut auf der Segment-Karte (überschreibt den blauen Puls —
    während einer Wiederherstellung sind .active UND .restoring gesetzt) */
-.backup-bank.comp.active.restoring .backup-top-bg {
+.backup-seg.active.restoring .backup-seg-card {
   stroke: #ff8a97;
-  stroke-width: 2.5;
-}
-.backup-bank.comp.active.restoring .backup-card {
   animation: backup-restore-pulse 1.1s ease-in-out infinite;
 }
 
@@ -1390,23 +1348,24 @@ body {
     transform: scale(1) translateY(0);
   }
 }
-/* GHCR-Stapel: neue Karte rutscht von oben ein / übrige rücken nach */
+/* GHCR-Band: neue Karte schiebt von links ein / übrige rutschen nach rechts
+   (ein Slot = 290 SVG-Einheiten: Kartenbreite 270 + Abstand 20) */
 @keyframes ghcr-card-enter {
   from {
     opacity: 0;
-    transform: translateY(-104px);
+    transform: translateX(-290px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 @keyframes ghcr-card-shift {
   from {
-    transform: translateY(-104px);
+    transform: translateX(-290px);
   }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 /* Puls der Geister-Karte (wird gebaut …) */

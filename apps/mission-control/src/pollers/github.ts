@@ -34,6 +34,7 @@ interface ApiRun {
   created_at: string;
   updated_at?: string;
   run_started_at?: string;
+  head_sha?: string;
   head_commit?: { message?: string } | null;
 }
 
@@ -129,6 +130,20 @@ export class GithubPoller {
         : buildPipelineStages(jobs, pendingApprovals);
 
     this.state.setGithub({ available: true, run, stages, pendingApprovals, jobs });
+
+    // Kausale Ehrlichkeit des Registry-Stapels: Sobald die CI-Stage (Build+Push)
+    // grün ist, liegt das Image WIRKLICH in der Registry — also erscheint die
+    // Karte jetzt, VOR dem INT-Deploy (die Ops-DB sieht die Version erst später).
+    if (workflow === 'pipeline' && run.version && chosen.head_sha) {
+      const ciStage = stages.find((stage) => stage.key === 'ci');
+      if (ciStage?.status === 'success') {
+        this.state.registerBuiltImage({
+          version: run.version,
+          imageTag: `sha-${chosen.head_sha.slice(0, 7)}`,
+          promoted: false,
+        });
+      }
+    }
   }
 
   private async fetchPendingApprovals(runId: number): Promise<string[]> {

@@ -130,9 +130,26 @@ export class StateStore {
     this.scheduleBroadcast();
   }
 
-  /** GHCR-Stapel setzen (vom Ops-DB-Poller): letzte 3 gebaute Versionen, neueste zuerst. */
+  /** Frisch gebaute Images (aus der GitHub-CI, VOR dem ersten Deploy sichtbar). */
+  private builtImages: RegistryImage[] = [];
+  /** Zuletzt aus der Ops-DB gelieferte Liste. */
+  private dbImages: RegistryImage[] = [];
+
+  /** GHCR-Stapel setzen (vom Ops-DB-Poller): letzte 3 deployte Versionen, neueste zuerst. */
   setRegistry(images: RegistryImage[]): void {
-    this.snapshot.registry = { images };
+    this.dbImages = images;
+    this.snapshot.registry = { images: mergeRegistryImages(this.builtImages, this.dbImages) };
+    this.scheduleBroadcast();
+  }
+
+  /**
+   * Frisch gebautes Image registrieren (CI-Stage grün = Push in die Registry ist
+   * real passiert) — erscheint damit VOR dem INT-Deploy auf dem Stapel.
+   */
+  registerBuiltImage(image: RegistryImage): void {
+    if (this.builtImages.some((existing) => existing.version === image.version)) return;
+    this.builtImages = [image, ...this.builtImages].slice(0, 3);
+    this.snapshot.registry = { images: mergeRegistryImages(this.builtImages, this.dbImages) };
     this.scheduleBroadcast();
   }
 
@@ -284,4 +301,26 @@ export class StateStore {
       this.suiteIdleTimer = null;
     }
   }
+}
+
+/**
+ * Vereinigt frisch gebaute Images (neueste zuerst) mit der Ops-DB-Sicht:
+ * Dedupe per Version — der Ops-DB-Eintrag gewinnt (kennt das promoted-Flag),
+ * die Position richtet sich nach der ersten Erwähnung (gebaut vor deployt).
+ * Ergebnis auf 3 gekappt.
+ */
+export function mergeRegistryImages(
+  built: RegistryImage[],
+  fromDb: RegistryImage[],
+): RegistryImage[] {
+  const byVersion = new Map<string, RegistryImage>();
+  for (const image of [...built, ...fromDb]) {
+    const existing = byVersion.get(image.version);
+    if (!existing) {
+      byVersion.set(image.version, image);
+    } else if (image.promoted && !existing.promoted) {
+      byVersion.set(image.version, { ...existing, promoted: true });
+    }
+  }
+  return [...byVersion.values()].slice(0, 3);
 }
