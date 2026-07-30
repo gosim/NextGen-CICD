@@ -19,7 +19,7 @@ on:
         type: string
         required: true
       image_tag:
-        description: 'Zu deployender Image-Tag (sha-…)'
+        description: 'Zu deployender Image-Tag (v1.0.N — unveränderliche Deploy-Identität)'
         type: string
         required: true
       gate_project:
@@ -39,7 +39,7 @@ on:
         type: string
         default: 'none'
       version:
-        description: 'Menschenlesbare Version (1.0.N) — nur Anzeige; Identität bleibt der sha-Tag'
+        description: 'Menschenlesbare Version (1.0.N) — Anzeige; der zugehörige v-Tag ist die Identität'
         type: string
         default: ''
 
@@ -97,7 +97,8 @@ jobs:
       - name: 'Promote: last_green fortschreiben & Images gegen Prune pinnen'
         run: |
           deploy/scripts/state.sh set ${{ inputs.env_key }} \
-            last_green='${{ inputs.image_tag }}' last_green_version='${{ inputs.version }}'
+            last_green='${{ inputs.image_tag }}' last_green_version='${{ inputs.version }}' \
+            last_green_ref='${{ github.sha }}'
           REGISTRY="$(grep '^REGISTRY=' deploy/env/${{ inputs.env_key }}.env | cut -d= -f2)"
           for IMG in backend frontend e2e; do
             docker tag "$REGISTRY/$IMG:${{ inputs.image_tag }}" "$REGISTRY/$IMG:green-${{ inputs.env_key }}" || true
@@ -173,8 +174,9 @@ jobs:
             curl -fsS -X POST -H "$AUTH" "$API/deployments/$DEP_ID/statuses" \
               -d '{"state":"inactive"}' >/dev/null || true
           fi
+          LAST_GREEN_REF="$(deploy/scripts/state.sh get ${{ inputs.env_key }} last_green_ref)"
           NEW_DEP="$(curl -fsS -X POST -H "$AUTH" "$API/deployments" \
-            -d "{\"ref\":\"${LAST_GREEN#sha-}\",\"environment\":\"${{ inputs.gh_environment }}\",\"auto_merge\":false,\"required_contexts\":[],\"description\":\"Automatischer Rollback auf $LAST_GREEN\"}" \
+            -d "{\"ref\":\"${LAST_GREEN_REF:-main}\",\"environment\":\"${{ inputs.gh_environment }}\",\"auto_merge\":false,\"required_contexts\":[],\"description\":\"Automatischer Rollback auf $LAST_GREEN\"}" \
             | jq -r '.id // empty' || true)"
           if [ -n "$NEW_DEP" ]; then
             curl -fsS -X POST -H "$AUTH" "$API/deployments/$NEW_DEP/statuses" \

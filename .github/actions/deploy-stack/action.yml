@@ -10,7 +10,7 @@ inputs:
     description: 'Umgebungs-Kürzel: int | abnahme | prod'
     required: true
   image_tag:
-    description: 'Zu deployender Image-Tag (sha-…)'
+    description: 'Zu deployender Image-Tag (v1.0.N)'
     required: true
   version:
     description: 'Menschenlesbare Version (1.0.N)'

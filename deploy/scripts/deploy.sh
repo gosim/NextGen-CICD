@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deployed einen Image-Tag in eine Umgebung — mit Zero-Downtime-Rolling-Update.
-#   IMAGE_TAG=sha-abc1234 deploy.sh <env>
+#   IMAGE_TAG=v1.0.42 deploy.sh <env>
 #
 # Ablauf:
 #   1. Images ziehen (fehlertolerant, lokaler Cache reicht beim Rollback).

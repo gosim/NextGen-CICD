@@ -16,7 +16,7 @@ on:
         type: string
         required: true
       image_tag:
-        description: 'Zu deployender Image-Tag (sha-…)'
+        description: 'Zu deployender Image-Tag (v1.0.N)'
         type: string
         required: true
       frontend_port:

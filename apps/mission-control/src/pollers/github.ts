@@ -134,12 +134,13 @@ export class GithubPoller {
     // Kausale Ehrlichkeit des Registry-Stapels: Sobald die CI-Stage (Build+Push)
     // grün ist, liegt das Image WIRKLICH in der Registry — also erscheint die
     // Karte jetzt, VOR dem INT-Deploy (die Ops-DB sieht die Version erst später).
-    if (workflow === 'pipeline' && run.version && chosen.head_sha) {
+    if (workflow === 'pipeline' && run.version) {
       const ciStage = stages.find((stage) => stage.key === 'ci');
       if (ciStage?.status === 'success') {
+        // Deploy-Identität ist der v-Tag (eindeutig pro Lauf, siehe _ci.yml).
         this.state.registerBuiltImage({
           version: run.version,
-          imageTag: `sha-${chosen.head_sha.slice(0, 7)}`,
+          imageTag: `v${run.version}`,
           promoted: false,
         });
       }

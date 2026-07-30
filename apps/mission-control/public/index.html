@@ -113,7 +113,7 @@
 
           <!-- Spaltenbeschriftungen (je Raster-Zeile) -->
           <text class="col-label" x="170" y="42" text-anchor="middle">Bauen → Registry</text>
-          <text class="col-label" x="752" y="248" text-anchor="middle">Umgebungen — Promotionskette</text>
+          <text class="col-label" x="960" y="210" text-anchor="middle">Umgebungen — Promotionskette</text>
           <text class="col-label" x="170" y="678" text-anchor="middle">Quality Gates</text>
           <text class="col-label" x="960" y="864" text-anchor="middle">Backups</text>
 
@@ -127,20 +127,20 @@
                Jeder Pfad läuft nur in den Korridoren zwischen den Raster-Zeilen und endet
                tangential an einer Bauteil-Kante — kein Pfad quert eine Komponente. -->
           <g id="flows-layer" fill="none">
-            <!-- CI → Bau-Slot (kurz horizontal, y≈125) -->
-            <path id="flow-ci-build" class="flow-path" d="M260 125 L340 125" />
-            <!-- registry-push: INT-Box-Oberkante senkrecht hinauf zum Band (x=516 = Pull−14) -->
-            <path id="flow-registry-push" class="flow-path" d="M516 260 L516 200" />
+            <!-- CI → GHCR-Rahmen: kurze Senkrechte (x=170) von CI-Unterkante (y=170) zur Rahmen-Oberkante (y=210) -->
+            <path id="flow-ci-build" class="flow-path" d="M170 170 L170 210" />
+            <!-- registry-push: INT-Oberkante (x=516) hinauf → Korridor y=250 → horizontal links zum GHCR-Rahmen (x=300) -->
+            <path id="flow-registry-push" class="flow-path" d="M516 260 L516 250 L300 250" />
 
-            <!-- <env>-pull: Band-Unterkante (y=200) senkrecht zur Box-Oberkante (y=260) -->
-            <path id="flow-int-pull" class="flow-path" d="M530 200 L530 260" />
-            <path id="flow-abnahme-pull" class="flow-path" d="M960 200 L960 260" />
-            <path id="flow-prod-pull" class="flow-path" d="M1390 200 L1390 260" />
+            <!-- <env>-pull: Austritt GHCR-Rahmen rechts (x=300,y=228) → oberer Korridor y=228 → Senkrechte hinab zur Box-Oberkante (y=260) -->
+            <path id="flow-int-pull" class="flow-path" d="M300 228 L530 228 L530 260" />
+            <path id="flow-abnahme-pull" class="flow-path" d="M300 228 L960 228 L960 260" />
+            <path id="flow-prod-pull" class="flow-path" d="M300 228 L1390 228 L1390 260" />
 
-            <!-- <env>-rollback-pull: rot, daneben versetzt (Pull-x +14) -->
-            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M544 200 L544 260" />
-            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M974 200 L974 260" />
-            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M1404 200 L1404 260" />
+            <!-- <env>-rollback-pull: rot, parallel +12 (Austritt y=240, Senkrechten x=542/972/1402) -->
+            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M300 240 L542 240 L542 260" />
+            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M300 240 L972 240 L972 260" />
+            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M300 240 L1402 240 L1402 260" />
 
             <!-- <env>-test: Playwright (x=300,y≈765) → Korridor (y≈665) → Box-Unterkante (y=640) -->
             <path id="flow-int-test" class="flow-path" d="M300 765 L300 665 L470 665 L470 640" />
@@ -163,68 +163,69 @@
           <!-- ===================== LINKE SPALTE: CI ===================== -->
           <g class="node comp" data-component="github-ci" role="img" aria-label="GitHub CI">
             <title>GitHub Actions — CI (Build &amp; Test, GHCR-Push)</title>
-            <rect class="node-box" x="40" y="60" width="220" height="120" rx="12" />
-            <text class="node-ic" x="150" y="118" text-anchor="middle">⚙️</text>
-            <text class="node-label" x="150" y="152" text-anchor="middle">CI</text>
+            <rect class="node-box" x="40" y="60" width="260" height="110" rx="12" />
+            <text class="node-ic" x="170" y="112" text-anchor="middle">⚙️</text>
+            <text class="node-label" x="170" y="148" text-anchor="middle">CI</text>
           </g>
 
-          <!-- GHCR — horizontales Image-Band: Bau-Slot (links) + die letzten 3 Versionen (links = neueste) -->
+          <!-- GHCR — vertikaler Image-Stapel LINKS: oben der Bau-Slot (Geister-Karte),
+               darunter die letzten 3 Versionen (oben = neueste) -->
           <g
             class="node comp ghcr-stack"
             data-component="ghcr"
             role="img"
-            aria-label="GHCR Image-Registry — Band der letzten Versionen"
+            aria-label="GHCR Image-Registry — Stapel der letzten Versionen"
           >
-            <title>GitHub Container Registry — Band der zuletzt gebauten Images (links = neueste)</title>
-            <rect class="ghcr-frame" x="320" y="50" width="1240" height="150" rx="14" />
-            <text class="ghcr-frame-label" x="336" y="74">GHCR — Image-Registry</text>
+            <title>GitHub Container Registry — Stapel der zuletzt gebauten Images (oben = neueste)</title>
+            <rect class="ghcr-frame" x="40" y="210" width="260" height="430" rx="14" />
+            <text class="ghcr-frame-label" x="56" y="234">GHCR — Image-Registry</text>
 
-            <!-- Ganz links im Rahmen liegt der reservierte Bau-Slot (x=340, w=270);
-                 normalerweise völlig unsichtbar. Die drei echten Karten-Slots beginnen
-                 rechts daneben (x=630/920/1210, Spacing 290) — so kann die Geister-Karte
-                 nie eine echte Karte überlappen. NEUESTE liegt links (Slot 0 = x=630). -->
+            <!-- Ganz oben im Rahmen liegt der reservierte Bau-Slot (y=238, h=70);
+                 normalerweise völlig unsichtbar. Die drei echten Karten-Slots liegen
+                 darunter (y=330/430/530, Abstand 100) — so kann die Geister-Karte nie
+                 eine echte Karte überlappen. NEUESTE liegt oben (Slot 0 = y=330). -->
 
-            <!-- Slot 0 = neueste Version (Band-Spitze, links neben dem Bau-Slot) -->
-            <g class="ghcr-slot" transform="translate(630,79)">
+            <!-- Slot 0 = neueste Version (Stapel-Spitze, oben unter dem Bau-Slot) -->
+            <g class="ghcr-slot" transform="translate(52,330)">
               <g class="ghcr-card empty" id="ghcr-card-0">
-                <rect class="ghcr-card-bg" x="0" y="0" width="270" height="92" rx="12" />
-                <rect class="ghcr-badge-bg" x="18" y="28" width="120" height="36" rx="18" />
-                <text class="ghcr-badge-txt" x="78" y="53" text-anchor="middle">–</text>
+                <rect class="ghcr-card-bg" x="0" y="0" width="236" height="88" rx="12" />
+                <rect class="ghcr-badge-bg" x="14" y="26" width="102" height="36" rx="18" />
+                <text class="ghcr-badge-txt" x="65" y="50" text-anchor="middle">–</text>
                 <g class="ghcr-ribbon" aria-hidden="true">
-                  <rect class="ghcr-ribbon-bg" x="158" y="32" width="94" height="28" rx="8" />
-                  <text class="ghcr-ribbon-txt" x="205" y="50" text-anchor="middle">LATEST ✓</text>
+                  <rect class="ghcr-ribbon-bg" x="126" y="26" width="98" height="36" rx="18" />
+                  <text class="ghcr-ribbon-txt" x="175" y="50" text-anchor="middle">LATEST ✓</text>
                 </g>
               </g>
             </g>
-            <g class="ghcr-slot" transform="translate(920,79)">
+            <g class="ghcr-slot" transform="translate(52,430)">
               <g class="ghcr-card empty" id="ghcr-card-1">
-                <rect class="ghcr-card-bg" x="0" y="0" width="270" height="92" rx="12" />
-                <rect class="ghcr-badge-bg" x="18" y="28" width="120" height="36" rx="18" />
-                <text class="ghcr-badge-txt" x="78" y="53" text-anchor="middle">–</text>
+                <rect class="ghcr-card-bg" x="0" y="0" width="236" height="88" rx="12" />
+                <rect class="ghcr-badge-bg" x="14" y="26" width="102" height="36" rx="18" />
+                <text class="ghcr-badge-txt" x="65" y="50" text-anchor="middle">–</text>
                 <g class="ghcr-ribbon" aria-hidden="true">
-                  <rect class="ghcr-ribbon-bg" x="158" y="32" width="94" height="28" rx="8" />
-                  <text class="ghcr-ribbon-txt" x="205" y="50" text-anchor="middle">LATEST ✓</text>
+                  <rect class="ghcr-ribbon-bg" x="126" y="26" width="98" height="36" rx="18" />
+                  <text class="ghcr-ribbon-txt" x="175" y="50" text-anchor="middle">LATEST ✓</text>
                 </g>
               </g>
             </g>
-            <g class="ghcr-slot" transform="translate(1210,79)">
+            <g class="ghcr-slot" transform="translate(52,530)">
               <g class="ghcr-card empty" id="ghcr-card-2">
-                <rect class="ghcr-card-bg" x="0" y="0" width="270" height="92" rx="12" />
-                <rect class="ghcr-badge-bg" x="18" y="28" width="120" height="36" rx="18" />
-                <text class="ghcr-badge-txt" x="78" y="53" text-anchor="middle">–</text>
+                <rect class="ghcr-card-bg" x="0" y="0" width="236" height="88" rx="12" />
+                <rect class="ghcr-badge-bg" x="14" y="26" width="102" height="36" rx="18" />
+                <text class="ghcr-badge-txt" x="65" y="50" text-anchor="middle">–</text>
                 <g class="ghcr-ribbon" aria-hidden="true">
-                  <rect class="ghcr-ribbon-bg" x="158" y="32" width="94" height="28" rx="8" />
-                  <text class="ghcr-ribbon-txt" x="205" y="50" text-anchor="middle">LATEST ✓</text>
+                  <rect class="ghcr-ribbon-bg" x="126" y="26" width="98" height="36" rx="18" />
+                  <text class="ghcr-ribbon-txt" x="175" y="50" text-anchor="middle">LATEST ✓</text>
                 </g>
               </g>
             </g>
 
             <!-- Geister-Karte: während CI baut, sitzt die kommende Version als
                  gestrichelte, pulsierende Zusatzkarte fest im reservierten Bau-Slot ganz
-                 links im Rahmen (per app.js ein-/ausgeblendet) — nie über einer echten Karte. -->
-            <g class="ghcr-ghost" id="ghcr-ghost" transform="translate(340,79)" aria-hidden="true">
-              <rect class="ghcr-ghost-bg" x="0" y="0" width="270" height="92" rx="12" />
-              <text class="ghcr-ghost-txt" x="135" y="52" text-anchor="middle">v– · wird gebaut…</text>
+                 oben im Rahmen (per app.js ein-/ausgeblendet) — nie über einer echten Karte. -->
+            <g class="ghcr-ghost" id="ghcr-ghost" transform="translate(52,238)" aria-hidden="true">
+              <rect class="ghcr-ghost-bg" x="0" y="0" width="236" height="70" rx="12" />
+              <text class="ghcr-ghost-txt" x="118" y="40" text-anchor="middle">v– · wird gebaut…</text>
             </g>
           </g>
 

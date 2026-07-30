@@ -858,7 +858,8 @@ body {
   animation: ghcr-card-shift 0.5s ease both;
 }
 
-/* Kompaktes „LATEST ✓"-Band (Blau-Akzent — Grün bleibt Status).
+/* „LATEST ✓"-Pill (Blau-Akzent — Grün bleibt Status): gleiche Pill-Höhe (36) und
+   Schriftgröße (15px) wie der Versions-Badge, rechts neben dem Badge in einer Zeile.
    Überlappt den Versions-Badge (links) nicht. */
 .ghcr-ribbon {
   opacity: 0;
@@ -873,9 +874,9 @@ body {
 }
 .ghcr-ribbon-txt {
   fill: #fff;
-  font-size: 9px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
 }
 /* Leere Slots tragen kein Band */
@@ -1348,24 +1349,24 @@ body {
     transform: scale(1) translateY(0);
   }
 }
-/* GHCR-Band: neue Karte schiebt von links ein / übrige rutschen nach rechts
-   (ein Slot = 290 SVG-Einheiten: Kartenbreite 270 + Abstand 20) */
+/* GHCR-Stapel: neue Karte schiebt von oben ein / übrige rutschen nach unten
+   (ein Slot = 100 SVG-Einheiten: Slot-Abstand y=330→430→530) */
 @keyframes ghcr-card-enter {
   from {
     opacity: 0;
-    transform: translateX(-290px);
+    transform: translateY(-100px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 @keyframes ghcr-card-shift {
   from {
-    transform: translateX(-290px);
+    transform: translateY(-100px);
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 /* Puls der Geister-Karte (wird gebaut …) */

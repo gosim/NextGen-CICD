@@ -16,7 +16,7 @@ inputs:
     description: 'Playwright-Project: int-regression | abnahme | smoke'
     required: true
   image_tag:
-    description: 'E2E-Image-Tag (sha-…)'
+    description: 'E2E-Image-Tag (v1.0.N)'
     required: true
   demo_flaky:
     description: 'Flaky-Demo-Test aktivieren'

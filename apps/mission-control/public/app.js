@@ -541,21 +541,21 @@ function syncFlowDots(flows) {
 // GHCR — IMAGE-STAPEL
 // --------------------------------------------------------------------------
 const GHCR_SLOTS = 3;
-/** Zuletzt gerenderte Band-Spitze — Wechsel löst die Slide-Animation aus. */
+/** Zuletzt gerenderte Stapel-Spitze — Wechsel löst die Slide-Animation aus. */
 let lastRegistryTop = null;
 
 /**
- * Rendert das horizontale Image-Band (max. 3 Karten, links = neueste).
- * Ändert sich images[0].version, schiebt eine neue Karte von links ein,
- * die übrigen rutschen nach rechts (CSS-Keyframes). Je Karte: nur der
- * Versions-Badge (Ziffern-Farblogik) + ggf. das kompakte „LATEST ✓"-Band.
+ * Rendert den vertikalen Image-Stapel (max. 3 Karten, oben = neueste).
+ * Ändert sich images[0].version, schiebt eine neue Karte von oben ein,
+ * die übrigen rutschen nach unten (CSS-Keyframes). Je Karte: nur der
+ * Versions-Badge (Ziffern-Farblogik) + ggf. die „LATEST ✓"-Pill.
  */
 function renderRegistry(state) {
   const images = Array.isArray(state.registry?.images) ? state.registry.images.slice(0, GHCR_SLOTS) : [];
   const topVersion = images[0]?.version ?? null;
   const isNewTop = lastRegistryTop !== null && topVersion !== null && topVersion !== lastRegistryTop;
 
-  // „LATEST ✓"-Band auf der NEUESTEN promoteten Karte (Position im Band egal, da
+  // „LATEST ✓"-Pill auf der NEUESTEN promoteten Karte (Position im Stapel egal, da
   // images[] bereits neueste-zuerst sortiert ist → erster Treffer = neueste).
   const latestPromotedIdx = images.findIndex((im) => im?.promoted === true);
 
@@ -573,7 +573,7 @@ function renderRegistry(state) {
     card.classList.toggle('pull-glow', pullActive && !!images[i]?.version && images[i].version === readVersion);
   }
 
-  // Band-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
+  // Stapel-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
   if (isNewTop && !prefersReducedMotion.matches) {
     for (let i = 0; i < GHCR_SLOTS; i++) {
       const card = document.getElementById(`ghcr-card-${i}`);
@@ -612,7 +612,7 @@ function renderGhcrGhost(state, images) {
   }
 }
 
-/** Füllt eine einzelne Band-Karte (oder markiert sie als leer/gestrichelt). */
+/** Füllt eine einzelne Stapel-Karte (oder markiert sie als leer/gestrichelt). */
 function fillGhcrCard(card, img) {
   const badgeBg = card.querySelector('.ghcr-badge-bg');
   const badgeTxt = card.querySelector('.ghcr-badge-txt');
