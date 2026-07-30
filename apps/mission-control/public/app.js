@@ -1,0 +1,720 @@
+// @ts-check
+/*
+ * NextGen CICD — Mission Control · Frontend-Logik
+ * Konsumiert ausschließlich GET /stream (SSE, Events "state" + optional "test").
+ * Reine DOM-Updates, idempotentes Diff-armes Rendern, keine externen Abhängigkeiten.
+ */
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const XLINK = 'http://www.w3.org/1999/xlink';
+const ENVS = /** @type {const} */ (['int', 'abnahme', 'prod']);
+
+/** Versions-Palette laut CONTRACT §7 — Index = letzte Ziffer der Version (nur Blau/Violett). */
+const VERSION_PALETTE = [
+  '#3274d9', // 0
+  '#a352cc', // 1
+  '#1f60c4', // 2
+  '#c77eea', // 3
+  '#8f3bb8', // 4
+  '#5794f2', // 5
+  '#7c2ea3', // 6
+  '#8ab8ff', // 7
+  '#2a5698', // 8
+  '#deb6f2', // 9
+];
+
+// --------------------------------------------------------------------------
+// Hilfsfunktionen
+// --------------------------------------------------------------------------
+
+/** @param {string|null|undefined} version */
+function versionColor(version) {
+  if (!version) return null;
+  const digits = String(version).match(/\d/g);
+  if (!digits) return VERSION_PALETTE[0];
+  const last = Number(digits[digits.length - 1]);
+  return VERSION_PALETTE[last] ?? VERSION_PALETTE[0];
+}
+
+/** Lesbare Textfarbe zu einer Badge-Hintergrundfarbe. @param {string} hex */
+function contrastText(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#0a1020' : '#ffffff';
+}
+
+/** @param {string|undefined|null} iso */
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+/** @param {number|null|undefined} ms */
+function fmtDuration(ms) {
+  if (ms == null) return '';
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+/** @param {string} tag @param {Record<string,string>} [attrs] */
+function svg(tag, attrs = {}) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+// --------------------------------------------------------------------------
+// DOM-Referenzen
+// --------------------------------------------------------------------------
+const el = {
+  runTitle: document.getElementById('run-title'),
+  runVersion: document.getElementById('run-version'),
+  runStatus: document.getElementById('run-status'),
+  runLink: /** @type {HTMLAnchorElement} */ (document.getElementById('run-link')),
+  ghOff: document.getElementById('gh-off'),
+  runUpdated: document.getElementById('run-updated'),
+  connHint: document.getElementById('conn-hint'),
+  alarmBanner: document.getElementById('alarm-banner'),
+  alarmText: document.getElementById('alarm-text'),
+  pipeline: document.getElementById('pipeline-band'),
+  testPanel: document.getElementById('test-panel'),
+  testTitle: document.getElementById('test-title'),
+  testProgress: document.getElementById('test-progress'),
+  testList: document.getElementById('test-list'),
+  map: document.getElementById('arch-map'),
+  flowDotsLayer: document.getElementById('flow-dots-layer'),
+  tickerItems: document.getElementById('ticker-items'),
+  tickerMore: document.getElementById('ticker-more'),
+  // Overlays
+  envOverlay: document.getElementById('env-overlay'),
+  envOvTitle: document.getElementById('env-ov-title'),
+  envOvBody: document.getElementById('env-ov-body'),
+  envOvBug: document.getElementById('env-ov-bug'),
+  envOvLink: /** @type {HTMLAnchorElement} */ (document.getElementById('env-ov-link')),
+  envOvClose: document.getElementById('env-ov-close'),
+  tickerOverlay: document.getElementById('ticker-overlay'),
+  tickerOvList: document.getElementById('ticker-ov-list'),
+  tickerOvClose: document.getElementById('ticker-ov-close'),
+};
+
+/** Letzter vollständiger Snapshot (für Overlays & Merge von test-Events). */
+let currentState = /** @type {any} */ (null);
+
+// --------------------------------------------------------------------------
+// KOPF / RUN
+// --------------------------------------------------------------------------
+const RUN_STATUS = {
+  queued: { cls: 'queued', text: 'In Warteschlange' },
+  in_progress: { cls: 'running', text: 'Läuft' },
+  waiting: { cls: 'waiting', text: 'Wartet auf Freigabe' },
+};
+
+/** @param {any} github */
+function renderHeader(github, generatedAt) {
+  const available = github?.available !== false;
+  const run = github?.run ?? null;
+
+  el.ghOff.hidden = available;
+
+  // Commit-Titel
+  el.runTitle.textContent = run?.title || (available ? 'Kein aktiver Lauf' : 'Kein GitHub-Token');
+
+  // Versions-Badge (Farblogik §7)
+  if (run?.version) {
+    const color = versionColor(run.version);
+    el.runVersion.hidden = false;
+    el.runVersion.textContent = `v${run.version}`;
+    el.runVersion.style.background = color;
+    el.runVersion.style.color = contrastText(color);
+  } else {
+    el.runVersion.hidden = true;
+  }
+
+  // Status-Chip
+  let cls = 'idle';
+  let text = 'Bereit';
+  if (run) {
+    if (run.status === 'completed') {
+      if (run.conclusion === 'success') {
+        cls = 'success';
+        text = 'Erfolgreich';
+      } else if (run.conclusion === 'failure') {
+        cls = 'failure';
+        text = 'Fehlgeschlagen';
+      } else if (run.conclusion === 'cancelled') {
+        cls = 'cancelled';
+        text = 'Abgebrochen';
+      } else {
+        cls = 'success';
+        text = 'Abgeschlossen';
+      }
+    } else if (RUN_STATUS[run.status]) {
+      cls = RUN_STATUS[run.status].cls;
+      text = RUN_STATUS[run.status].text;
+    }
+    if (run.workflow === 'stability' && cls === 'running') text = 'Stabilitäts-Lauf';
+  }
+  el.runStatus.dataset.status = cls;
+  el.runStatus.textContent = text;
+
+  // GitHub-Link
+  if (available && run?.url) {
+    el.runLink.hidden = false;
+    el.runLink.href = run.url;
+  } else {
+    el.runLink.hidden = true;
+  }
+
+  el.runUpdated.textContent = generatedAt ? `aktualisiert ${fmtTime(generatedAt)}` : '';
+}
+
+// --------------------------------------------------------------------------
+// PIPELINE-BAND
+// --------------------------------------------------------------------------
+function renderStages(github) {
+  const stages = Array.isArray(github?.stages) ? github.stages : [];
+  const keys = stages.map((s) => s.key).join('|');
+
+  if (el.pipeline.dataset.keys !== keys) {
+    // Struktur hat sich geändert (z. B. pipeline ↔ stability) → Knoten neu aufbauen
+    el.pipeline.textContent = '';
+    stages.forEach((s, i) => {
+      if (i > 0) {
+        const arrow = document.createElement('div');
+        arrow.className = 'stage-arrow';
+        arrow.setAttribute('aria-hidden', 'true');
+        arrow.textContent = '→';
+        el.pipeline.appendChild(arrow);
+      }
+      const stage = document.createElement('div');
+      stage.className = 'stage';
+      stage.dataset.key = s.key;
+      stage.innerHTML =
+        '<div class="stage-node">' +
+        '<span class="stage-ic" aria-hidden="true"></span>' +
+        '<span class="stage-spin" aria-hidden="true"></span>' +
+        '<span class="stage-txt"></span>' +
+        '</div>' +
+        '<div class="stage-step"></div>';
+      el.pipeline.appendChild(stage);
+    });
+    el.pipeline.dataset.keys = keys;
+  }
+
+  // Werte idempotent aktualisieren
+  stages.forEach((s) => {
+    const node = el.pipeline.querySelector(`.stage[data-key="${s.key}"]`);
+    if (!node) return;
+    node.dataset.status = s.status || 'idle';
+    const txt = node.querySelector('.stage-txt');
+    if (txt.textContent !== s.label) txt.textContent = s.label;
+
+    const stepEl = node.querySelector('.stage-step');
+    const stepText = s.status === 'running' && s.currentStep ? s.currentStep : '';
+    if (stepEl.textContent !== stepText) stepEl.textContent = stepText;
+
+    if (s.url) {
+      node.classList.add('clickable');
+      node.dataset.url = s.url;
+      node.setAttribute('title', 'Auf GitHub öffnen');
+    } else {
+      node.classList.remove('clickable');
+      delete node.dataset.url;
+      node.removeAttribute('title');
+    }
+  });
+}
+
+el.pipeline.addEventListener('click', (e) => {
+  const stage = /** @type {HTMLElement} */ (e.target).closest('.stage');
+  if (stage && stage.dataset.url) window.open(stage.dataset.url, '_blank', 'noopener');
+});
+
+// --------------------------------------------------------------------------
+// TESTFALL-PANEL
+// --------------------------------------------------------------------------
+const TC_SYMBOL = { passed: '✓', failed: '✗', flaky: '⚠', skipped: '–' };
+
+function renderTests(tests) {
+  const cases = Array.isArray(tests?.cases) ? tests.cases : [];
+  const visible = !!(tests?.active || cases.length);
+  el.testPanel.hidden = !visible;
+  if (!visible) {
+    el.testList.textContent = '';
+    return;
+  }
+
+  // Titel
+  if (tests.source === 'stability') {
+    el.testTitle.textContent = '🔍 Stabilitäts-Check';
+  } else {
+    const suite = tests.suite || 'Regression';
+    const env = tests.env ? tests.env.toUpperCase() : '—';
+    el.testTitle.textContent = `🛡 Quality Gate: ${suite} gegen ${env}`;
+  }
+
+  // Fortschritt
+  const total = tests.summary?.total ?? cases.length;
+  const done = cases.filter((c) => c.status && c.status !== 'running').length;
+  el.testProgress.textContent = `${done}/${total}`;
+
+  // Liste reconcilen (Reihenfolge = Datenreihenfolge)
+  const seen = new Set();
+  cases.forEach((c) => {
+    seen.add(c.id);
+    let li = el.testList.querySelector(`.test-case[data-id="${cssEscape(c.id)}"]`);
+    if (!li) {
+      li = document.createElement('li');
+      li.className = 'test-case slide-in';
+      li.dataset.id = c.id;
+      li.innerHTML =
+        '<span class="tc-ic" aria-hidden="true"></span>' +
+        '<span class="tc-title"></span>' +
+        '<span class="tc-dur"></span>';
+      el.testList.appendChild(li);
+    }
+    updateCase(li, c);
+    // In Datenreihenfolge einsortieren
+    el.testList.appendChild(li);
+  });
+
+  // Verwaiste entfernen
+  el.testList.querySelectorAll('.test-case').forEach((li) => {
+    if (!seen.has(li.dataset.id)) li.remove();
+  });
+}
+
+/** @param {HTMLElement} li */
+function updateCase(li, c) {
+  const status = c.status || 'running';
+  if (li.dataset.status !== status) li.dataset.status = status;
+
+  const icCell = li.querySelector('.tc-ic');
+  if (status === 'running') {
+    if (!icCell.querySelector('.tc-spin')) {
+      icCell.textContent = '';
+      const spin = document.createElement('span');
+      spin.className = 'tc-spin';
+      icCell.appendChild(spin);
+    }
+  } else {
+    const sym = TC_SYMBOL[status] || '•';
+    if (icCell.textContent !== sym) icCell.textContent = sym;
+  }
+
+  const title = li.querySelector('.tc-title');
+  if (title.textContent !== c.title) {
+    title.textContent = c.title || c.id;
+    title.setAttribute('title', c.title || c.id);
+  }
+
+  const dur = li.querySelector('.tc-dur');
+  const durText = status === 'running' ? '' : fmtDuration(c.durationMs);
+  if (dur.textContent !== durText) dur.textContent = durText;
+
+  // Fehlertext (failed/flaky) — aufklappbar
+  const hasError = (status === 'failed' || status === 'flaky') && c.error;
+  let details = li.querySelector('.tc-error');
+  if (hasError) {
+    if (!details) {
+      details = document.createElement('details');
+      details.className = 'tc-error';
+      details.innerHTML = '<summary>Fehlerdetails</summary><pre></pre>';
+      li.appendChild(details);
+    }
+    const pre = details.querySelector('pre');
+    if (pre.textContent !== c.error) pre.textContent = c.error;
+  } else if (details) {
+    details.remove();
+  }
+}
+
+/** Minimaler Selector-Escape für data-id (Fallback wenn CSS.escape fehlt). */
+function cssEscape(s) {
+  return window.CSS && CSS.escape ? CSS.escape(String(s)) : String(s).replace(/["\\\]]/g, '\\$&');
+}
+
+// --------------------------------------------------------------------------
+// ARCHITEKTUR-KARTE
+// --------------------------------------------------------------------------
+
+/** aktive Fluss-Punkt-Gruppen: flowId -> <g> */
+const flowDots = new Map();
+
+function renderMap(state) {
+  const choreo = state.choreography || {};
+  const active = new Set(choreo.active || []);
+  const flows = new Set(choreo.flows || []);
+
+  // 1) Aktive Komponenten pulsieren lassen
+  el.map.querySelectorAll('[data-component]').forEach((node) => {
+    node.classList.toggle('active', active.has(node.getAttribute('data-component')));
+  });
+
+  // 2) Fluss-Pfade hervorheben + wandernde Punkte verwalten
+  el.map.querySelectorAll('.flow-path').forEach((path) => {
+    const id = path.id.replace(/^flow-/, '');
+    path.classList.toggle('flow-active', flows.has(id));
+  });
+  syncFlowDots(flows);
+
+  // 3) Umgebungen: Health, Instanz-Punkte, Versions-Badge
+  const environments = state.environments || {};
+  ENVS.forEach((env) => {
+    const data = environments[env];
+    const box = el.map.querySelector(`.env-box[data-env="${env}"]`);
+    if (!box) return;
+
+    const up = data?.health === 'up';
+    const down = data?.health === 'down';
+    box.querySelectorAll('.health-dot').forEach((dot) => {
+      dot.classList.toggle('health-up', up);
+      dot.classList.toggle('health-down', down);
+    });
+
+    const vGroup = box.querySelector('.env-version');
+    const rect = vGroup.querySelector('rect');
+    const text = vGroup.querySelector('text');
+    if (data?.version) {
+      const color = versionColor(data.version);
+      rect.style.fill = color;
+      text.style.fill = contrastText(color);
+      const label = `v${data.version}`;
+      if (text.textContent !== label) text.textContent = label;
+    } else {
+      rect.style.fill = '';
+      text.style.fill = '';
+      if (text.textContent !== '–') text.textContent = '–';
+    }
+  });
+
+  // 4) Alarm
+  const alarm = choreo.alarm || null;
+  ENVS.forEach((env) => {
+    const box = el.map.querySelector(`.env-box[data-env="${env}"]`);
+    if (box) box.classList.toggle('alarm', !!alarm && alarm.env === env);
+  });
+  if (alarm) {
+    const envName = String(alarm.env || '').toUpperCase();
+    el.alarmText.textContent = `Rollback läuft — ${envName} wird wiederhergestellt`;
+    el.alarmBanner.hidden = false;
+  } else {
+    el.alarmBanner.hidden = true;
+  }
+}
+
+/** @param {Set<string>} flows */
+function syncFlowDots(flows) {
+  if (prefersReducedMotion.matches) {
+    // Punkte werden per CSS ausgeblendet; nichts erzeugen
+    flowDots.forEach((g) => g.remove());
+    flowDots.clear();
+    return;
+  }
+  // Neue aktive Flüsse: Punkte anlegen
+  flows.forEach((flowId) => {
+    if (flowDots.has(flowId)) return;
+    const path = document.getElementById(`flow-${flowId}`);
+    if (!path) return;
+    const restore = path.classList.contains('flow-restore');
+    const g = svg('g', { class: 'flow-dots' + (restore ? ' flow-dots-restore' : '') });
+    for (let i = 0; i < 4; i++) {
+      const dot = svg('circle', { r: '5', class: 'flow-dot' });
+      const motion = svg('animateMotion', {
+        dur: '2.2s',
+        repeatCount: 'indefinite',
+        begin: `${(i * 0.55).toFixed(2)}s`,
+        calcMode: 'linear',
+      });
+      const mpath = svg('mpath', { href: `#flow-${flowId}` });
+      mpath.setAttributeNS(XLINK, 'href', `#flow-${flowId}`);
+      motion.appendChild(mpath);
+      dot.appendChild(motion);
+      g.appendChild(dot);
+    }
+    el.flowDotsLayer.appendChild(g);
+    flowDots.set(flowId, g);
+  });
+  // Nicht mehr aktive Flüsse: Punkte entfernen
+  flowDots.forEach((g, flowId) => {
+    if (!flows.has(flowId)) {
+      g.remove();
+      flowDots.delete(flowId);
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
+// TICKER
+// --------------------------------------------------------------------------
+let lastTickerKeys = [];
+
+function renderTicker(ticker) {
+  const items = Array.isArray(ticker) ? ticker : [];
+  const visible = items.slice(0, 3);
+  const keys = visible.map((t) => `${t.at}|${t.text}`);
+
+  el.tickerItems.textContent = '';
+  visible.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'ticker-item';
+    if (!lastTickerKeys.includes(keys[i])) li.classList.add('slide-in');
+    const time = document.createElement('span');
+    time.className = 'ti-time';
+    time.textContent = fmtTime(t.at);
+    const txt = document.createElement('span');
+    txt.className = 'ti-text';
+    txt.textContent = t.text;
+    txt.setAttribute('title', t.text);
+    li.appendChild(time);
+    li.appendChild(txt);
+    el.tickerItems.appendChild(li);
+  });
+  lastTickerKeys = keys;
+
+  el.tickerMore.hidden = items.length <= 3;
+}
+
+function openTickerOverlay() {
+  const items = Array.isArray(currentState?.ticker) ? currentState.ticker : [];
+  el.tickerOvList.textContent = '';
+  items.forEach((t) => {
+    const li = document.createElement('li');
+    const time = document.createElement('span');
+    time.className = 'ti-time';
+    time.textContent = fmtTime(t.at);
+    const txt = document.createElement('span');
+    txt.textContent = t.text;
+    li.appendChild(time);
+    li.appendChild(txt);
+    el.tickerOvList.appendChild(li);
+  });
+  el.tickerOverlay.hidden = false;
+}
+
+// --------------------------------------------------------------------------
+// ENV-DETAIL-OVERLAY
+// --------------------------------------------------------------------------
+const ENV_LABEL = { int: 'INT (Integration)', abnahme: 'ABNAHME', prod: 'PROD (Produktion)' };
+
+function openEnvOverlay(env) {
+  const data = currentState?.environments?.[env];
+  el.envOvTitle.textContent = `Umgebung ${ENV_LABEL[env] || env.toUpperCase()}`;
+
+  const rows = [
+    ['Version', data?.version ? `v${data.version}` : '—', false],
+    ['Git-SHA', data?.gitSha || '—', true],
+    ['Health', data?.health === 'up' ? 'up · erreichbar' : data?.health === 'down' ? 'down · nicht erreichbar' : 'unbekannt', false],
+  ];
+  const instances = Array.isArray(data?.instances) ? data.instances : [];
+  rows.push(['Instanzen', instances.length ? instances.join(', ') : '—', true]);
+
+  el.envOvBody.innerHTML = '';
+  rows.forEach(([label, value, mono]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    if (mono) dd.className = 'mono';
+    dd.textContent = value;
+    el.envOvBody.appendChild(dt);
+    el.envOvBody.appendChild(dd);
+  });
+
+  // Demo-Bug-Warnhinweis
+  if (data?.demoBug && data.demoBug !== 'none') {
+    el.envOvBug.hidden = false;
+    el.envOvBug.textContent = `⚠ Demo-Bug aktiv: „${data.demoBug}" — diese Version ist absichtlich fehlerhaft (Rollback-Demo).`;
+  } else {
+    el.envOvBug.hidden = true;
+  }
+
+  el.envOvLink.hidden = true;
+  el.envOverlay.hidden = false;
+}
+
+// Env-Boxen klick-/tastaturbar machen
+el.map.querySelectorAll('.env-box').forEach((box) => {
+  const env = box.getAttribute('data-env');
+  box.addEventListener('click', () => openEnvOverlay(env));
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openEnvOverlay(env);
+    }
+  });
+});
+
+// Overlay-Schließen
+function closeOverlays() {
+  el.envOverlay.hidden = true;
+  el.tickerOverlay.hidden = true;
+}
+el.envOvClose.addEventListener('click', closeOverlays);
+el.tickerOvClose.addEventListener('click', closeOverlays);
+el.tickerMore.addEventListener('click', openTickerOverlay);
+[el.envOverlay, el.tickerOverlay].forEach((ov) => {
+  ov.addEventListener('click', (e) => {
+    if (e.target === ov) closeOverlays();
+  });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeOverlays();
+});
+
+// --------------------------------------------------------------------------
+// DEMO-STEUERUNG (workflow_dispatch + Freigaben über den Server)
+// --------------------------------------------------------------------------
+const ctrl = {
+  bar: document.getElementById('control-bar'),
+  approvals: document.getElementById('ctrl-approvals'),
+  feedback: document.getElementById('ctrl-feedback'),
+  rollback: document.getElementById('ctrl-rollback'),
+  rollbackEnv: document.getElementById('ctrl-rollback-env'),
+  rollbackDb: document.getElementById('ctrl-rollback-db'),
+};
+
+let feedbackTimer = null;
+function ctrlFeedback(text, isError) {
+  ctrl.feedback.textContent = text;
+  ctrl.feedback.classList.toggle('is-error', Boolean(isError));
+  clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => {
+    ctrl.feedback.textContent = '';
+  }, 6000);
+}
+
+async function ctrlPost(path, body, button) {
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      ctrlFeedback(data.message ?? 'Ausgelöst.');
+    } else {
+      ctrlFeedback(data.error ?? `Fehler (HTTP ${response.status})`, true);
+    }
+  } catch {
+    ctrlFeedback('Server nicht erreichbar.', true);
+  } finally {
+    // Kurze Sperre gegen Doppelklicks; der Live-Zustand zeigt den Fortschritt.
+    setTimeout(() => {
+      if (button) button.disabled = false;
+    }, 2000);
+  }
+}
+
+for (const button of ctrl.bar.querySelectorAll('[data-scenario]')) {
+  button.addEventListener('click', () => {
+    ctrlPost('/actions/trigger', { scenario: button.dataset.scenario }, button);
+  });
+}
+ctrl.rollback.addEventListener('click', () => {
+  ctrlPost(
+    '/actions/trigger',
+    { scenario: 'rollback', env: ctrl.rollbackEnv.value, restoreDb: ctrl.rollbackDb.checked },
+    ctrl.rollback,
+  );
+});
+
+/** Freigabe-Buttons dynamisch aus pendingApprovals; Steuerung nur mit GitHub-Token sichtbar. */
+function renderControls(github) {
+  ctrl.bar.hidden = !github?.available;
+  const pending = Array.isArray(github?.pendingApprovals) ? github.pendingApprovals : [];
+  const want = pending.join(',');
+  if (ctrl.approvals.dataset.pending === want) return;
+  ctrl.approvals.dataset.pending = want;
+  ctrl.approvals.replaceChildren(
+    ...pending.map((env) => {
+      const button = document.createElement('button');
+      button.className = 'ctrl-btn ctrl-approve';
+      button.textContent = `✅ ${env === 'abnahme' ? 'Abnahme' : 'PROD'} freigeben`;
+      button.addEventListener('click', () => ctrlPost('/actions/approve', { env }, button));
+      return button;
+    }),
+  );
+}
+
+// --------------------------------------------------------------------------
+// STATE-ANWENDUNG
+// --------------------------------------------------------------------------
+function applyState(state) {
+  if (!state || typeof state !== 'object') return;
+  currentState = state;
+  renderHeader(state.github, state.generatedAt);
+  renderStages(state.github);
+  renderTests(state.tests || {});
+  renderMap(state);
+  renderTicker(state.ticker);
+  renderControls(state.github);
+}
+
+/** Einzelnes Live-Test-Event (Zusatzsignal) in den aktuellen Snapshot einpflegen. */
+function applyTestEvent(tc) {
+  if (!tc || !tc.id) return;
+  if (!currentState) currentState = {};
+  if (!currentState.tests) currentState.tests = { active: true, cases: [] };
+  const tests = currentState.tests;
+  if (!Array.isArray(tests.cases)) tests.cases = [];
+  tests.active = true;
+  const idx = tests.cases.findIndex((c) => c.id === tc.id);
+  if (idx >= 0) tests.cases[idx] = { ...tests.cases[idx], ...tc };
+  else tests.cases.push(tc);
+  renderTests(tests);
+}
+
+// --------------------------------------------------------------------------
+// VERBINDUNG (SSE) + Fallback
+// --------------------------------------------------------------------------
+function setConnected(connected) {
+  el.connHint.hidden = connected;
+}
+
+function connect() {
+  const source = new EventSource('/stream');
+
+  source.addEventListener('open', () => setConnected(true));
+
+  source.addEventListener('state', (e) => {
+    setConnected(true);
+    try {
+      applyState(JSON.parse(e.data));
+    } catch (err) {
+      console.error('Ungültiger state-Snapshot:', err);
+    }
+  });
+
+  source.addEventListener('test', (e) => {
+    try {
+      applyTestEvent(JSON.parse(e.data));
+    } catch (err) {
+      console.error('Ungültiges test-Event:', err);
+    }
+  });
+
+  // EventSource verbindet nach Abbruch automatisch neu — wir zeigen nur den Hinweis.
+  source.addEventListener('error', () => {
+    if (source.readyState !== EventSource.OPEN) setConnected(false);
+  });
+}
+
+// Schneller Erst-Anstrich über den REST-Fallback (SSE übernimmt danach live).
+fetch('/api/state')
+  .then((r) => (r.ok ? r.json() : null))
+  .then((s) => {
+    if (s && !currentState) applyState(s);
+  })
+  .catch(() => {
+    /* egal — SSE liefert den Snapshot ohnehin */
+  });
+
+connect();

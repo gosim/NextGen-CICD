@@ -93,14 +93,23 @@ Alternativ über die GitHub-UI: Actions → „Pipeline" bzw. „Manueller Rollb
 
 DB-Zugang je Umgebung: User/DB `app`, Passwort im jeweiligen [deploy/env/*.env](deploy/env/). Ops-DB: `localhost:5400` (User/DB/Passwort `ops`).
 
-### Dashboard (Grafana)
+### Dashboards & Steuerung
 
 | Was | URL |
 |---|---|
+| **Mission Control** (Live-Prozess-Visualisierung + Demo-Steuerung) | http://localhost:9100 |
 | Grafana (anonymer Viewer) | http://localhost:8000 |
 | Haupt-Dashboard „NextGen CICD — Environments" | http://localhost:8000/d/nextgen-environments/ |
 | Editier-Login | `admin` / `admin` |
 | Portainer (Container-GUI, alle Stacks/Logs/Konsolen) | http://localhost:9000 — Erst-Setup verlangt den **Setup-Token** aus `docker logs nextgen-ops-portainer` (Zeile `setup_token=…`; Portainer ≥ 2.39) und muss binnen 5 min abgeschlossen sein, sonst Container neu starten |
+
+**Mission-Control-Token (einmalig):** Für GitHub-Live-Daten und die Demo-Steuerung (Szenarien starten, Freigaben erteilen) braucht die App einen **fine-grained PAT**, der nur für dieses Repo gilt: GitHub → Settings → Developer settings → [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) → Repository access: *Only select repositories* → `NextGen-CICD` → Permissions: **Actions (Read and write)**, **Deployments (Read and write)**, **Contents (Read-only)**. Dann lokal speichern (nie im Repo!):
+
+```bash
+printf 'MC_GITHUB_TOKEN=%s\n' '<dein-token>' > ~/deployments/mission-control.env && chmod 600 ~/deployments/mission-control.env
+```
+
+`stacks.sh up` lädt die Datei automatisch; ohne sie läuft Mission Control als reine Umgebungs-Visualisierung (GitHub-Teil aus). Die App ist bewusst nur an `127.0.0.1` gebunden.
 
 ### GitHub
 

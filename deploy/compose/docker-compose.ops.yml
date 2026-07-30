@@ -76,6 +76,31 @@ services:
     # Sicherheitsgründen und der Container muss neu gestartet werden
     # (docker restart nextgen-ops-portainer), um das Zeitfenster erneut zu öffnen.
 
+  mission-control:
+    # Live-Prozess-Visualisierung der Pipeline (Beamer-Anker). Wird bewusst
+    # NICHT durch die Pipeline promoted — Ops-Tooling wie Grafana, lokal gebaut.
+    build:
+      context: ../..
+      dockerfile: apps/mission-control/Dockerfile
+    image: nextgen-mission-control:local
+    container_name: nextgen-ops-mission-control
+    # Nur localhost: Die App kann Workflows starten/freigeben — niemand im LAN
+    # soll das können.
+    ports:
+      - '127.0.0.1:9100:9100'
+    environment:
+      OPS_DB_URL: postgres://ops:ops@ops-db:5432/ops
+      GITHUB_REPOSITORY: gosim/NextGen-CICD
+      # Fine-grained PAT aus ~/deployments/mission-control.env — stacks.sh
+      # exportiert MC_GITHUB_TOKEN vor dem Compose-Aufruf (nie im Repo!).
+      GITHUB_TOKEN: ${MC_GITHUB_TOKEN:-}
+    depends_on:
+      ops-db:
+        condition: service_healthy
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+
 volumes:
   ops-db-data:
   grafana-data:

@@ -19,6 +19,22 @@ KEEP_DOCKER="${2:-}"
 
 api_port() { grep -E '^API_PORT=' "$ROOT/deploy/env/$1.env" | cut -d= -f2; }
 
+# Fine-grained PAT für Mission Control (Demo-Steuerung + GitHub-Live) aus der
+# lokalen, nie committeten Datei laden — Compose substituiert MC_GITHUB_TOKEN.
+load_mc_token() {
+  MC_ENV_FILE="$HOME/deployments/mission-control.env"
+  if [ -f "$MC_ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$MC_ENV_FILE"
+    set +a
+  else
+    echo "── Hinweis: $MC_ENV_FILE fehlt — Mission Control läuft ohne GitHub-Live/Demo-Steuerung." >&2
+    echo "   Einrichten: Fine-grained PAT erstellen (siehe README) und speichern mit:" >&2
+    echo "   printf 'MC_GITHUB_TOKEN=%s\\n' '<dein-token>' > \"$MC_ENV_FILE\" && chmod 600 \"$MC_ENV_FILE\"" >&2
+  fi
+}
+
 # Gedeckelter Engine-Ping statt `docker info`: der CLI-Aufruf kann gegen einen
 # halb gestarteten Daemon minutenlang hängen, der curl-Ping bricht nach 2s ab.
 engine_ready() {
@@ -63,7 +79,9 @@ quit_docker() {
 case "$CMD" in
   up)
     ensure_docker
-    echo "── Ops-Stack (Grafana, Portainer)…"
+    echo "── Ops-Stack (Grafana, Portainer, Mission Control)…"
+    load_mc_token
+    docker compose -p nextgen-ops -f "$OPS_FILE" up -d --build mission-control
     docker compose -p nextgen-ops -f "$OPS_FILE" up -d
     for e in $ENVS; do
       TAG="$("$STATE" get "$e" current)"
@@ -80,7 +98,7 @@ case "$CMD" in
       echo "── ${e}: starte mit ${TAG}…"
       IMAGE_TAG="$TAG" "$ROOT/deploy/scripts/deploy.sh" "$e"
     done
-    echo "✅ Alles oben. Grafana: http://localhost:8000  Portainer: http://localhost:9000"
+    echo "✅ Alles oben. Mission Control: http://localhost:9100  Grafana: http://localhost:8000  Portainer: http://localhost:9000"
     ;;
   stop)
     for e in $ENVS; do
@@ -88,6 +106,7 @@ case "$CMD" in
       docker compose -p "nextgen-$e" stop 2>/dev/null || true
     done
     echo "── ops: stoppe…"
+    load_mc_token 2>/dev/null || true
     docker compose -p nextgen-ops -f "$OPS_FILE" stop 2>/dev/null || true
     quit_docker
     echo "✅ Alles gestoppt (Container + Daten bleiben; wieder hoch mit: stacks.sh up)."
@@ -98,6 +117,7 @@ case "$CMD" in
       docker compose -p "nextgen-$e" down 2>/dev/null || true
     done
     echo "── ops: entferne Container…"
+    load_mc_token 2>/dev/null || true
     docker compose -p nextgen-ops -f "$OPS_FILE" down 2>/dev/null || true
     quit_docker
     echo "✅ Alle Container entfernt (Volumes/Daten bleiben; Komplett-Rückbau: down + 'docker volume rm')."

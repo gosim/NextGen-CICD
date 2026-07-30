@@ -20,4 +20,22 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
     },
   },
+  {
+    // Mission-Control-Frontend: läuft im Browser (Vanilla JS ohne Build-Schritt).
+    files: ['apps/mission-control/public/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        EventSource: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        CSS: 'readonly',
+      },
+    },
+  },
 );

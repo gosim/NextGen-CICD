@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>"
+    />
+    <title>NextGen CICD — Mission Control</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- ============================ KOPF ============================ -->
+    <header class="topbar" aria-label="Kopfzeile">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">🛰️</span>
+        <div class="brand-text">
+          <h1>NextGen CICD <span class="brand-sep">—</span> Mission Control</h1>
+          <p class="brand-sub">Quality-Gates · Auto-Rollback · immer eine grüne Umgebung</p>
+        </div>
+      </div>
+
+      <div class="run" id="run-panel" aria-live="polite">
+        <div class="run-main">
+          <span class="run-title" id="run-title">Warte auf ersten Lauf …</span>
+          <span class="run-badges">
+            <span class="version-badge" id="run-version" hidden>–</span>
+            <span class="status-chip" id="run-status" data-status="idle">Bereit</span>
+          </span>
+        </div>
+        <div class="run-links">
+          <a class="gh-link" id="run-link" href="#" target="_blank" rel="noopener" hidden>Auf GitHub öffnen ↗</a>
+          <span class="gh-off" id="gh-off" hidden>GitHub-Live aus (kein Token)</span>
+          <span class="run-updated" id="run-updated" title="Letzte Aktualisierung"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Verbindungshinweis -->
+    <div class="conn-hint" id="conn-hint" role="status" hidden>
+      <span class="conn-dot" aria-hidden="true"></span>
+      Verbindung getrennt — versuche erneut zu verbinden …
+    </div>
+
+    <!-- Alarm-Banner -->
+    <div class="alarm-banner" id="alarm-banner" role="alert" hidden>
+      <span aria-hidden="true">⛑</span>
+      <span id="alarm-text">Rollback läuft</span>
+    </div>
+
+    <!-- ====================== DEMO-STEUERUNG ====================== -->
+    <section class="control-bar" id="control-bar" aria-label="Demo-Steuerung" hidden>
+      <span class="control-label">🎬 Demo-Steuerung</span>
+      <button class="ctrl-btn" data-scenario="normal" title="pipeline.yml ohne Flags — Akt 1">▶️ Normaler Lauf</button>
+      <button class="ctrl-btn ctrl-danger" data-scenario="break" title="DEMO_BUG=broken-create — Gate rot, Auto-Rollback (Akt 2)">💥 Kaputtes Deployment</button>
+      <button class="ctrl-btn ctrl-warn" data-scenario="flaky" title="Absichtlich instabiler Test — gelbes Flaky-Badge (Akt 3)">⚠️ Flaky-Test</button>
+      <button class="ctrl-btn" data-scenario="stability" title="Alle Umgebungen jetzt prüfen (läuft sonst stündlich)">🔍 Stabilitäts-Check</button>
+      <span class="ctrl-group" title="rollback-manual.yml — Akt 4">
+        <button class="ctrl-btn" id="ctrl-rollback">⛑ Rollback</button>
+        <select id="ctrl-rollback-env" aria-label="Rollback-Umgebung">
+          <option value="int">INT</option>
+          <option value="abnahme">Abnahme</option>
+          <option value="prod">PROD</option>
+        </select>
+        <label class="ctrl-check"><input type="checkbox" id="ctrl-rollback-db" /> DB-Restore</label>
+      </span>
+      <span class="ctrl-approvals" id="ctrl-approvals"></span>
+      <span class="ctrl-feedback" id="ctrl-feedback" role="status"></span>
+    </section>
+
+    <main class="stage-area">
+      <!-- ====================== PIPELINE-BAND ====================== -->
+      <section class="pipeline-section" aria-label="Pipeline-Stufen">
+        <div class="pipeline" id="pipeline-band" data-keys=""></div>
+      </section>
+
+      <!-- ====================== TESTFALL-PANEL ====================== -->
+      <section class="test-panel" id="test-panel" aria-label="Testfälle" hidden>
+        <div class="test-head">
+          <h2 class="test-title" id="test-title">Quality Gate</h2>
+          <span class="test-progress" id="test-progress">0/0</span>
+        </div>
+        <ul class="test-list" id="test-list"></ul>
+      </section>
+
+      <!-- ====================== ARCHITEKTUR-KARTE ====================== -->
+      <section class="map-section" aria-label="Architektur-Karte">
+        <svg
+          id="arch-map"
+          viewBox="0 0 1600 900"
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label="Live-Architektur der CI/CD-Pipeline"
+        >
+          <!-- Spaltenbeschriftungen -->
+          <text class="col-label" x="155" y="34" text-anchor="middle">GitHub</text>
+          <text class="col-label" x="425" y="34" text-anchor="middle">Ausführung (Mac)</text>
+          <text class="col-label" x="1080" y="26" text-anchor="middle">Umgebungen</text>
+
+          <!-- ===================== FLÜSSE (unterste Ebene) ===================== -->
+          <g id="flows-layer" fill="none">
+            <path id="flow-ci-build" class="flow-path" d="M155 180 L155 230" />
+
+            <!-- INT -->
+            <path id="flow-int-pull" class="flow-path" d="M250 280 C430 280 470 160 620 160" />
+            <path id="flow-int-migrate" class="flow-path" d="M1400 175 L1360 175" />
+            <path id="flow-int-backup" class="flow-path" d="M1300 230 C1000 340 720 320 520 285" />
+            <path id="flow-int-test" class="flow-path" d="M520 440 L710 180 L905 228 L1300 175" />
+            <path id="flow-int-restore" class="flow-path flow-restore" d="M520 285 C760 300 1020 300 1300 230" />
+            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M520 130 L620 130" />
+
+            <!-- ABNAHME -->
+            <path id="flow-abnahme-pull" class="flow-path" d="M250 280 C430 320 450 440 620 440" />
+            <path id="flow-abnahme-migrate" class="flow-path" d="M1400 455 L1360 455" />
+            <path id="flow-abnahme-backup" class="flow-path" d="M1300 510 C1000 560 720 400 520 285" />
+            <path id="flow-abnahme-test" class="flow-path" d="M520 440 L710 460 L905 508 L1300 455" />
+            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M520 285 C760 400 1020 500 1300 510" />
+            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M520 130 C560 300 580 410 620 410" />
+
+            <!-- PROD -->
+            <path id="flow-prod-pull" class="flow-path" d="M250 280 C430 420 450 720 620 720" />
+            <path id="flow-prod-migrate" class="flow-path" d="M1400 735 L1360 735" />
+            <path id="flow-prod-backup" class="flow-path" d="M1300 790 C1000 700 720 500 520 285" />
+            <path id="flow-prod-test" class="flow-path" d="M520 440 L710 740 L905 788 L1300 735" />
+            <path id="flow-prod-restore" class="flow-path flow-restore" d="M520 285 C760 520 1020 720 1300 790" />
+            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M520 130 C560 420 580 690 620 690" />
+          </g>
+
+          <!-- ===================== GITHUB-SPALTE ===================== -->
+          <g class="node comp" data-component="github-ci" role="img" aria-label="GitHub CI">
+            <title>GitHub Actions — CI (Build &amp; Test, GHCR-Push)</title>
+            <rect class="node-box" x="60" y="80" width="190" height="100" rx="12" />
+            <text class="node-ic" x="155" y="128" text-anchor="middle">⚙️</text>
+            <text class="node-label" x="155" y="158" text-anchor="middle">CI</text>
+          </g>
+          <g class="node comp" data-component="ghcr" role="img" aria-label="GHCR Registry">
+            <title>GitHub Container Registry — Image-Ablage (sha-Tags)</title>
+            <rect class="node-box" x="60" y="230" width="190" height="100" rx="12" />
+            <text class="node-ic" x="155" y="278" text-anchor="middle">📦</text>
+            <text class="node-label" x="155" y="308" text-anchor="middle">GHCR</text>
+          </g>
+
+          <!-- ===================== RUNNER-SPALTE ===================== -->
+          <g class="node comp" data-component="runner" role="img" aria-label="Self-hosted Runner">
+            <title>Self-hosted Runner (Mac) — führt Deploy, Gate &amp; Rollback aus</title>
+            <rect class="node-box" x="330" y="80" width="190" height="100" rx="12" />
+            <text class="node-ic" x="425" y="126" text-anchor="middle">🖥️</text>
+            <text class="node-label" x="425" y="156" text-anchor="middle">Runner (Mac)</text>
+          </g>
+          <g class="node comp" data-component="backup-store" role="img" aria-label="Backup-Speicher">
+            <title>Backup-Speicher — pg_dump-Sicherungen für den Rollback</title>
+            <path class="cyl-body" d="M335 235 L335 340 A90 13 0 0 0 515 340 L515 235" />
+            <ellipse class="cyl-line" cx="425" cy="272" rx="90" ry="13" />
+            <ellipse class="cyl-line" cx="425" cy="309" rx="90" ry="13" />
+            <ellipse class="cyl-top" cx="425" cy="235" rx="90" ry="13" />
+            <text class="node-label" x="425" y="332" text-anchor="middle">Backups</text>
+          </g>
+          <g class="node comp" data-component="playwright" role="img" aria-label="Playwright">
+            <title>Playwright — E2E-Tests als Quality Gate</title>
+            <rect class="node-box" x="330" y="390" width="190" height="100" rx="12" />
+            <text class="node-ic" x="425" y="436" text-anchor="middle">🎭</text>
+            <text class="node-label" x="425" y="466" text-anchor="middle">Playwright</text>
+          </g>
+
+          <!-- ===================== UMGEBUNG: INT ===================== -->
+          <g class="env-box" data-env="int" transform="translate(620,40)" tabindex="0" role="button" aria-label="Umgebung INT — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="932" height="262" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="920" height="250" rx="14" />
+            <line class="env-divider" x1="0" y1="42" x2="920" y2="42" />
+            <text class="env-name" x="20" y="28">INT</text>
+            <g class="env-version">
+              <rect x="700" y="8" width="120" height="26" rx="13" />
+              <text x="760" y="26" text-anchor="middle">–</text>
+            </g>
+            <circle class="env-health health-dot" cx="890" cy="21" r="9" />
+
+            <g class="node comp" data-component="int-proxy">
+              <title>Proxy (nginx) — /api-Weiterleitung</title>
+              <rect class="node-box" x="30" y="95" width="120" height="90" rx="10" />
+              <text class="node-ic sm" x="90" y="135" text-anchor="middle">🔀</text>
+              <text class="node-sub" x="90" y="162" text-anchor="middle">Proxy</text>
+            </g>
+            <g class="node comp inst" data-component="int-fe-1">
+              <title>Frontend-Instanz fe-1</title>
+              <rect class="node-box" x="200" y="60" width="170" height="76" rx="10" />
+              <text class="node-label" x="285" y="98" text-anchor="middle">fe-1</text>
+              <text class="node-sub" x="285" y="120" text-anchor="middle">Frontend</text>
+              <circle class="inst-dot health-dot" cx="356" cy="76" r="6" />
+            </g>
+            <g class="node comp inst" data-component="int-fe-2">
+              <title>Frontend-Instanz fe-2</title>
+              <rect class="node-box" x="400" y="60" width="170" height="76" rx="10" />
+              <text class="node-label" x="485" y="98" text-anchor="middle">fe-2</text>
+              <text class="node-sub" x="485" y="120" text-anchor="middle">Frontend</text>
+              <circle class="inst-dot health-dot" cx="556" cy="76" r="6" />
+            </g>
+            <g class="node comp inst" data-component="int-be-1">
+              <title>Backend-Instanz be-1</title>
+              <rect class="node-box" x="200" y="150" width="170" height="76" rx="10" />
+              <text class="node-label" x="285" y="188" text-anchor="middle">be-1</text>
+              <text class="node-sub" x="285" y="210" text-anchor="middle">Backend</text>
+              <circle class="inst-dot health-dot" cx="356" cy="166" r="6" />
+            </g>
+            <g class="node comp inst" data-component="int-be-2">
+              <title>Backend-Instanz be-2</title>
+              <rect class="node-box" x="400" y="150" width="170" height="76" rx="10" />
+              <text class="node-label" x="485" y="188" text-anchor="middle">be-2</text>
+              <text class="node-sub" x="485" y="210" text-anchor="middle">Backend</text>
+              <circle class="inst-dot health-dot" cx="556" cy="166" r="6" />
+            </g>
+            <g class="node comp" data-component="int-db">
+              <title>PostgreSQL-Datenbank</title>
+              <path class="cyl-body" d="M620 80 L620 190 A60 14 0 0 0 740 190 L740 80" />
+              <ellipse class="cyl-top" cx="680" cy="80" rx="60" ry="14" />
+              <text class="node-label" x="680" y="150" text-anchor="middle">DB</text>
+            </g>
+            <g class="node comp" data-component="int-migrate">
+              <title>Migrationen (drizzle) — One-Shot vor Backend-Start</title>
+              <rect class="node-box" x="780" y="105" width="110" height="60" rx="10" />
+              <text class="node-ic sm" x="835" y="132" text-anchor="middle">⚡</text>
+              <text class="node-sub" x="835" y="154" text-anchor="middle">Migrate</text>
+            </g>
+          </g>
+
+          <!-- ===================== UMGEBUNG: ABNAHME ===================== -->
+          <g class="env-box" data-env="abnahme" transform="translate(620,320)" tabindex="0" role="button" aria-label="Umgebung Abnahme — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="932" height="262" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="920" height="250" rx="14" />
+            <line class="env-divider" x1="0" y1="42" x2="920" y2="42" />
+            <text class="env-name" x="20" y="28">ABNAHME</text>
+            <g class="env-version">
+              <rect x="700" y="8" width="120" height="26" rx="13" />
+              <text x="760" y="26" text-anchor="middle">–</text>
+            </g>
+            <circle class="env-health health-dot" cx="890" cy="21" r="9" />
+
+            <g class="node comp" data-component="abnahme-proxy">
+              <title>Proxy (nginx) — /api-Weiterleitung</title>
+              <rect class="node-box" x="30" y="95" width="120" height="90" rx="10" />
+              <text class="node-ic sm" x="90" y="135" text-anchor="middle">🔀</text>
+              <text class="node-sub" x="90" y="162" text-anchor="middle">Proxy</text>
+            </g>
+            <g class="node comp inst" data-component="abnahme-fe-1">
+              <title>Frontend-Instanz fe-1</title>
+              <rect class="node-box" x="200" y="60" width="170" height="76" rx="10" />
+              <text class="node-label" x="285" y="98" text-anchor="middle">fe-1</text>
+              <text class="node-sub" x="285" y="120" text-anchor="middle">Frontend</text>
+              <circle class="inst-dot health-dot" cx="356" cy="76" r="6" />
+            </g>
+            <g class="node comp inst" data-component="abnahme-fe-2">
+              <title>Frontend-Instanz fe-2</title>
+              <rect class="node-box" x="400" y="60" width="170" height="76" rx="10" />
+              <text class="node-label" x="485" y="98" text-anchor="middle">fe-2</text>
+              <text class="node-sub" x="485" y="120" text-anchor="middle">Frontend</text>
+              <circle class="inst-dot health-dot" cx="556" cy="76" r="6" />
+            </g>
+            <g class="node comp inst" data-component="abnahme-be-1">
+              <title>Backend-Instanz be-1</title>
+              <rect class="node-box" x="200" y="150" width="170" height="76" rx="10" />
+              <text class="node-label" x="285" y="188" text-anchor="middle">be-1</text>
+              <text class="node-sub" x="285" y="210" text-anchor="middle">Backend</text>
+              <circle class="inst-dot health-dot" cx="356" cy="166" r="6" />
+            </g>
+            <g class="node comp inst" data-component="abnahme-be-2">
+              <title>Backend-Instanz be-2</title>
+              <rect class="node-box" x="400" y="150" width="170" height="76" rx="10" />
+              <text class="node-label" x="485" y="188" text-anchor="middle">be-2</text>
+              <text class="node-sub" x="485" y="210" text-anchor="middle">Backend</text>
+              <circle class="inst-dot health-dot" cx="556" cy="166" r="6" />
+            </g>
+            <g class="node comp" data-component="abnahme-db">
+              <title>PostgreSQL-Datenbank</title>
+              <path class="cyl-body" d="M620 80 L620 190 A60 14 0 0 0 740 190 L740 80" />
+              <ellipse class="cyl-top" cx="680" cy="80" rx="60" ry="14" />
+              <text class="node-label" x="680" y="150" text-anchor="middle">DB</text>
+            </g>
+            <g class="node comp" data-component="abnahme-migrate">
+              <title>Migrationen (drizzle) — One-Shot vor Backend-Start</title>
+              <rect class="node-box" x="780" y="105" width="110" height="60" rx="10" />
+              <text class="node-ic sm" x="835" y="132" text-anchor="middle">⚡</text>
+              <text class="node-sub" x="835" y="154" text-anchor="middle">Migrate</text>
+            </g>
+          </g>
+
+          <!-- ===================== UMGEBUNG: PROD ===================== -->
+          <g class="env-box" data-env="prod" transform="translate(620,600)" tabindex="0" role="button" aria-label="Umgebung PROD — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="932" height="262" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="920" height="250" rx="14" />
+            <line class="env-divider" x1="0" y1="42" x2="920" y2="42" />
+            <text class="env-name" x="20" y="28">PROD</text>
+            <g class="env-version">
+              <rect x="700" y="8" width="120" height="26" rx="13" />
+              <text x="760" y="26" text-anchor="middle">–</text>
+            </g>
+            <circle class="env-health health-dot" cx="890" cy="21" r="9" />
+
+            <g class="node comp" data-component="prod-proxy">
+              <title>Proxy (nginx) — /api-Weiterleitung</title>
+              <rect class="node-box" x="30" y="95" width="120" height="90" rx="10" />
+              <text class="node-ic sm" x="90" y="135" text-anchor="middle">🔀</text>
+              <text class="node-sub" x="90" y="162" text-anchor="middle">Proxy</text>
+            </g>
+            <g class="node comp inst" data-component="prod-fe-1">
+              <title>Frontend-Instanz fe-1</title>
+              <rect class="node-box" x="200" y="60" width="170" height="76" rx="10" />
+              <text class="node-label" x="285" y="98" text-anchor="middle">fe-1</text>
+              <text class="node-sub" x="285" y="120" text-anchor="middle">Frontend</text>
+              <circle class="inst-dot health-dot" cx="356" cy="76" r="6" />
+            </g>
+            <g class="node comp inst" data-component="prod-fe-2">
+              <title>Frontend-Instanz fe-2</title>
+              <rect class="node-box" x="400" y="60" width="170" height="76" rx="10" />
+              <text class="node-label" x="485" y="98" text-anchor="middle">fe-2</text>
+              <text class="node-sub" x="485" y="120" text-anchor="middle">Frontend</text>
+              <circle class="inst-dot health-dot" cx="556" cy="76" r="6" />
+            </g>
+            <g class="node comp inst" data-component="prod-be-1">
+              <title>Backend-Instanz be-1</title>
+              <rect class="node-box" x="200" y="150" width="170" height="76" rx="10" />
+              <text class="node-label" x="285" y="188" text-anchor="middle">be-1</text>
+              <text class="node-sub" x="285" y="210" text-anchor="middle">Backend</text>
+              <circle class="inst-dot health-dot" cx="356" cy="166" r="6" />
+            </g>
+            <g class="node comp inst" data-component="prod-be-2">
+              <title>Backend-Instanz be-2</title>
+              <rect class="node-box" x="400" y="150" width="170" height="76" rx="10" />
+              <text class="node-label" x="485" y="188" text-anchor="middle">be-2</text>
+              <text class="node-sub" x="485" y="210" text-anchor="middle">Backend</text>
+              <circle class="inst-dot health-dot" cx="556" cy="166" r="6" />
+            </g>
+            <g class="node comp" data-component="prod-db">
+              <title>PostgreSQL-Datenbank</title>
+              <path class="cyl-body" d="M620 80 L620 190 A60 14 0 0 0 740 190 L740 80" />
+              <ellipse class="cyl-top" cx="680" cy="80" rx="60" ry="14" />
+              <text class="node-label" x="680" y="150" text-anchor="middle">DB</text>
+            </g>
+            <g class="node comp" data-component="prod-migrate">
+              <title>Migrationen (drizzle) — One-Shot vor Backend-Start</title>
+              <rect class="node-box" x="780" y="105" width="110" height="60" rx="10" />
+              <text class="node-ic sm" x="835" y="132" text-anchor="middle">⚡</text>
+              <text class="node-sub" x="835" y="154" text-anchor="middle">Migrate</text>
+            </g>
+          </g>
+
+          <!-- Wandernde Fluss-Punkte (dynamisch von app.js befüllt) -->
+          <g id="flow-dots-layer"></g>
+        </svg>
+
+        <!-- Legende -->
+        <div class="legend" aria-hidden="true">
+          <span class="lg"><span class="lg-dot lg-idle"></span>Bereit</span>
+          <span class="lg"><span class="lg-dot lg-run"></span>Läuft</span>
+          <span class="lg"><span class="lg-dot lg-wait"></span>Wartet</span>
+          <span class="lg"><span class="lg-dot lg-ok"></span>Erfolg / Health up</span>
+          <span class="lg"><span class="lg-dot lg-fail"></span>Fehler / Health down</span>
+          <span class="lg"><span class="lg-line lg-flow"></span>Datenfluss</span>
+          <span class="lg"><span class="lg-line lg-restore"></span>Wiederherstellung</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============================ TICKER ============================ -->
+    <footer class="ticker" aria-label="Ereignis-Ticker">
+      <span class="ticker-label" aria-hidden="true">📡 Ereignisse</span>
+      <ul class="ticker-items" id="ticker-items"></ul>
+      <button class="ticker-more" id="ticker-more" type="button" hidden>Alle anzeigen</button>
+    </footer>
+
+    <!-- ============================ OVERLAYS ============================ -->
+    <div class="overlay" id="env-overlay" hidden>
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="env-ov-title">
+        <button class="overlay-close" id="env-ov-close" type="button" aria-label="Schließen">✕</button>
+        <h2 id="env-ov-title" class="overlay-title">Umgebung</h2>
+        <dl class="ov-grid" id="env-ov-body"></dl>
+        <div class="ov-bug" id="env-ov-bug" hidden></div>
+        <a class="gh-link ov-link" id="env-ov-link" href="#" target="_blank" rel="noopener" hidden>Live öffnen ↗</a>
+      </div>
+    </div>
+
+    <div class="overlay" id="ticker-overlay" hidden>
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="ticker-ov-title">
+        <button class="overlay-close" id="ticker-ov-close" type="button" aria-label="Schließen">✕</button>
+        <h2 id="ticker-ov-title" class="overlay-title">Alle Ereignisse</h2>
+        <ul class="ov-ticker-list" id="ticker-ov-list"></ul>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

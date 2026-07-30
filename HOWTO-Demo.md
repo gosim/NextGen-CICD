@@ -30,7 +30,8 @@ curl -fsS http://localhost:8000/api/health | jq -r .database
 
 | Tab/Fenster | URL | Zweck |
 |---|---|---|
-| **Beamer-Anker: Grafana** | `http://localhost:8000` | Dashboard „NextGen CICD — Environments" — läuft durchgehend mit |
+| **Beamer-Anker: Mission Control** | `http://localhost:9100` | Live-Prozess: Pipeline-Band, Einzeltests in Echtzeit, Architektur-Karte mit pulsierenden Komponenten und Datenflüssen — **plus 🎬 Demo-Steuerung**: alle Szenarien und Freigaben per Button, kein Wechsel zu GitHub nötig |
+| Grafana (Zweit-Tab) | `http://localhost:8000` | Metriken & Historie: Stabilität-Bänder, Deployment-Historie, Flaky-Trend |
 | GitHub Actions | `https://github.com/gosim/NextGen-CICD/actions` | Pipeline-Läufe live |
 | GitHub Environments | `https://github.com/gosim/NextGen-CICD/deployments` | „Welche Version läuft wo" aus GitHub-Sicht |
 | App INT | `http://localhost:8001` | Umgebungs-Badge blau „INT" |
@@ -67,7 +68,7 @@ GitHubs Actions-Graph ordnet Jobs strikt nach Abhängigkeit an — das ist nicht
 
 1. **Actions → Pipeline → Run workflow** → Haken bei **`demo_break_deploy`** → Run workflow. Erklären: Das simuliert einen Bug — `POST /api/mitarbeiter` liefert 500 (im UI: `DEMO-BUG AKTIV`-Badge auf INT nach dem Deploy).
 2. Live verfolgen: Deploy auf INT läuft durch (die App startet ja — der Bug zeigt sich erst funktional!), dann wird das **Gate rot** (Test „Mitarbeiter anlegen" schlägt fehl).
-3. **Der Moment:** Der Job **„INT / ⛑ Rollback"** springt an — er stellt die Datenbank aus dem Pre-Deploy-Backup wieder her und deployt die letzte grüne Version.
+3. **Der Moment:** Der Job **„INT / ⛑ Rollback"** springt an — er stellt die Datenbank aus dem Pre-Deploy-Backup wieder her und deployt die letzte grüne Version. In Mission Control läuft dazu die rote Restore-Choreografie: Alarm-Rahmen um die INT-Box, animierter Fluss Backup→Datenbank, das Versions-Badge dreht zurück.
 4. **Beweis führen:**
    - App INT (`:8001`) neu laden → altes Badge, kein Demo-Bug-Badge, Anlegen funktioniert
    - Workflow-Run ist **rot** (das Signal!), die **Umgebung ist grün** — genau andersherum als im Ist-Zustand vieler Projekte

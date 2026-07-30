@@ -60,6 +60,9 @@ runs:
           -e RUN_ID="$GITHUB_RUN_ID" \
           -e DEMO_FLAKY='${{ inputs.demo_flaky }}' \
           -e CI=true \
+          -e MC_URL='http://host.docker.internal:9100' \
+          -e MC_SOURCE='${{ inputs.source }}' \
+          -e MC_ENV='${{ inputs.env_key }}' \
           -v "$OUT/test-results:/repo/e2e/test-results" \
           -v "$OUT/playwright-report:/repo/e2e/playwright-report" \
           "$REGISTRY/e2e:${{ inputs.image_tag }}" \

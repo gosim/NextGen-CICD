@@ -13,6 +13,10 @@ const reporter: ReporterDescription[] = [
 if (CI) {
   reporter.push(['github']);
 }
+// Mission-Control-Live-Reporter: nur wenn MC_URL gesetzt (fail-safe, siehe src/live-reporter.ts).
+if (process.env.MC_URL) {
+  reporter.push(['./src/live-reporter.ts']);
+}
 
 export default defineConfig({
   testDir: './tests',
