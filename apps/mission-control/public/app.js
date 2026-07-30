@@ -561,10 +561,11 @@ function renderRegistry(state) {
   const pullActive = ENVS.some((e) => flows.has(`${e}-pull`));
   const readVersion = state.github?.run?.version ?? images[0]?.version ?? null;
 
-  // Rollback-Lese-Hervorhebung: Es glüht die LATEST-✓-Karte (neueste promotete
-  // Version = last_green = Rollback-Ziel) — NICHT die Stapel-Spitze, die beim
-  // Rollback gerade die fehlgeschlagene Version ist (§3).
+  // Rollback-Hervorhebung (§3): Die fehlgeschlagene Version wird ROT umrahmt
+  // (run.version des Pipeline-Laufs; beim manuellen Rollback null → kein roter
+  // Rahmen), das Rollback-Ziel — die LATEST-✓-Karte — pulsiert GRÜN.
   const rollbackActive = ENVS.some((e) => flows.has(`${e}-rollback-pull`));
+  const failedVersion = rollbackActive ? (state.github?.run?.version ?? null) : null;
 
   for (let i = 0; i < GHCR_SLOTS; i++) {
     const card = document.getElementById(`ghcr-card-${i}`);
@@ -572,7 +573,8 @@ function renderRegistry(state) {
     fillGhcrCard(card, images[i]);
     card.classList.toggle('is-latest', i === latestPromotedIdx);
     card.classList.toggle('pull-glow', pullActive && !!images[i]?.version && images[i].version === readVersion);
-    card.classList.toggle('glow', rollbackActive && i === latestPromotedIdx);
+    card.classList.toggle('glow', !!failedVersion && !!images[i]?.version && images[i].version === failedVersion);
+    card.classList.toggle('target-glow', rollbackActive && i === latestPromotedIdx);
   }
 
   // Stapel-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)

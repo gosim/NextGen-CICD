@@ -27,6 +27,7 @@ function job(
     status,
     conclusion: null,
     url: `https://ci/${name}`,
+    startedAt: null,
     completedAt: null,
     steps,
     ...extra,
@@ -286,7 +287,7 @@ describe('deriveChoreography — Nachleuchten', () => {
     expect(result.flows).not.toContain('int-backup');
   });
 
-  it('Rollback-Job vor 8 s erfolgreich beendet → Restore/Pull leuchten nach, Alarm ist AUS', () => {
+  it('Rollback-Job vor 8 s erfolgreich beendet → Pull-Phase leuchtet nach, Alarm ist AUS', () => {
     const result = deriveChoreography(
       input([
         job('INT / ⛑ Rollback', 'completed', [], {
@@ -296,8 +297,11 @@ describe('deriveChoreography — Nachleuchten', () => {
       ]),
       NOW,
     );
-    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int', 'ghcr']));
-    expect(result.flows).toEqual(expect.arrayContaining(['int-restore', 'int-rollback-pull']));
+    // Nachleuchten = letzter Erzähl-Beat: nur der Image-Pull, der Restore hatte
+    // seine Phase während des Jobs.
+    expect(result.active).toContain('ghcr');
+    expect(result.flows).toContain('int-rollback-pull');
+    expect(result.flows).not.toContain('int-restore');
     // „Rollback läuft" wäre nach Abschluss eine Falschaussage.
     expect(result.alarm).toBeNull();
   });
@@ -315,7 +319,7 @@ describe('deriveChoreography — Nachleuchten', () => {
     expect(result).toEqual({ active: [], flows: [], alarm: null });
   });
 
-  it('manueller Rollback-Job ("Rollback int") läuft → volle Effekte + Alarm', () => {
+  it('manueller Rollback-Job ("Rollback int") läuft ohne started_at → defensiv beide Phasen + Alarm', () => {
     const result = deriveChoreography(input([job('Rollback int', 'in_progress')]), NOW);
     expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int', 'ghcr']));
     expect(result.flows).toEqual(expect.arrayContaining(['int-restore', 'int-rollback-pull']));
@@ -334,5 +338,99 @@ describe('deriveChoreography — Nachleuchten', () => {
       NOW,
     );
     expect(result).toEqual({ active: [], flows: [], alarm: null });
+  });
+});
+
+// ── Sequenz-Regeln (CONTRACT §4): erst Backup/Restore-Erzählung, dann Pull ──
+
+describe('deriveChoreography — Sequenz', () => {
+  const NOW = Date.parse('2026-07-30T12:00:00Z');
+  const secondsAgo = (s: number): string => new Date(NOW - s * 1000).toISOString();
+
+  it('laufendes Backup unterdrückt den Deploy-Pull derselben Umgebung', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment'),
+          step('Stack deployen: v1.0.32 → int'),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).toContain('int-backup');
+    expect(result.flows).not.toContain('int-pull');
+  });
+
+  it('Backup im Nachleuchten unterdrückt den Deploy-Pull weiterhin', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed', {
+            completedAt: secondsAgo(5),
+          }),
+          step('Stack deployen: v1.0.32 → int'),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).toContain('int-backup');
+    expect(result.flows).not.toContain('int-pull');
+  });
+
+  it('nach Ablauf des Backup-Fensters übernimmt der Pull', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed', {
+            completedAt: secondsAgo(20),
+          }),
+          step('Stack deployen: v1.0.32 → int'),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).toContain('int-pull');
+    expect(result.flows).not.toContain('int-backup');
+  });
+
+  it('Backup-Unterdrückung ist pro Umgebung — INT-Backup lässt den Abnahme-Pull laufen', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed', {
+            completedAt: secondsAgo(5),
+          }),
+        ]),
+        job('Abnahme / 🚀 Deploy', 'in_progress', [
+          step('Rolling-Deployment: v1.0.32 → abnahme'),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).toContain('abnahme-pull');
+    expect(result.flows).toContain('int-backup');
+  });
+
+  it('Rollback-Phase 1 (erste 15 s): nur Restore, kein Pull, kein ghcr', () => {
+    const result = deriveChoreography(
+      input([job('INT / ⛑ Rollback', 'in_progress', [], { startedAt: secondsAgo(5) })]),
+      NOW,
+    );
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int']));
+    expect(result.active).not.toContain('ghcr');
+    expect(result.flows).toContain('int-restore');
+    expect(result.flows).not.toContain('int-rollback-pull');
+    expect(result.alarm).toEqual({ env: 'int', reason: 'Rollback läuft' });
+  });
+
+  it('Rollback-Phase 2 (nach 15 s): nur Pull + ghcr, kein Restore', () => {
+    const result = deriveChoreography(
+      input([job('INT / ⛑ Rollback', 'in_progress', [], { startedAt: secondsAgo(20) })]),
+      NOW,
+    );
+    expect(result.active).toContain('ghcr');
+    expect(result.flows).toContain('int-rollback-pull');
+    expect(result.flows).not.toContain('int-restore');
+    expect(result.alarm).toEqual({ env: 'int', reason: 'Rollback läuft' });
   });
 });

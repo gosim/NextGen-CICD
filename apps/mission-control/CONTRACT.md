@@ -95,6 +95,12 @@ Job-Namen kommen als `"<Stage> / <Jobname>"` (z. B. `"INT / 🚀 Deploy"`). Stag
 
 **Nachleucht-Fenster (`AFTERGLOW_MS` = 15 s):** Backup-Step und Rollback-Jobs erzeugen ihre Effekte auch noch, wenn sie vor ≤ 15 s ERFOLGREICH endeten (`completed_at`, conclusion=success — skipped zählt nicht). Grund: Ein pg_dump von 2–3 s läge sonst komplett zwischen zwei 5-s-Polls und würde nie sichtbar; so sind Backup/Restore garantiert ≥ 10 s zu sehen (15 s Fenster − 5 s Poll-Slack; typisch 15–20 s inkl. Broadcast-Drossel). Der Alarm-Banner nimmt am Nachleuchten NICHT teil („Rollback läuft" wäre nach Abschluss falsch). Alle übrigen Effekte bleiben strikt an laufende Jobs/Steps gebunden. Annahme: NTP-synchrone Host-Uhr (Vergleich GitHub-Serverzeit ↔ lokale Uhr).
 
+**Sequenz-Regeln (kausale Erzählung, keine Parallel-Effekte):**
+1. **Erst sichern, dann ausrollen:** Solange die Backup-Erzählung einer Umgebung sichtbar ist (Step läuft oder Nachleuchten), wird der Deploy-Pull DERSELBEN Umgebung unterdrückt (`<env>-pull`, frontend/backend/ghcr, Promote-Kettenpfeil). Real ist die Reihenfolge ohnehin sequenziell (pg_dump → Rolling); ohne die Regel überlappte das Backup-Nachleuchten mit dem laufenden Deploy-Step. Pro Umgebung — Backup INT unterdrückt nicht den Abnahme-Pull.
+2. **Rollback-Phasen (`RESTORE_PHASE_MS` = 15 s):** Die Jobs-API zeigt den Rollback als EINEN Step, real läuft erst restore.sh, dann deploy.sh. Erzähl-Konvention: erste 15 s ab Job-Start NUR Restore (`<env>-restore`, db + Dump-Stapel), danach NUR Rollback-Pull (`<env>-rollback-pull`, ghcr); das Nachleuchten nach Job-Ende zeigt die Pull-Phase. Ohne brauchbares `started_at` defensiv beide.
+
+**Registry-Hervorhebung beim Rollback (Frontend):** Die fehlgeschlagene Version (`run.version` des Pipeline-Laufs; beim manuellen Rollback null → entfällt) wird ROT umrahmt, das Rollback-Ziel — die LATEST-✓-Karte — pulsiert GRÜN.
+
 ## 5. Test-Ingest: `POST /events/test` (vom Playwright-Live-Reporter)
 
 ```jsonc

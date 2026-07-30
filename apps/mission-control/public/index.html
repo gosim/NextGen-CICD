@@ -8,7 +8,9 @@
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>"
     />
     <title>NextGen CICD — Mission Control</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <!-- ?v=… = Cache-Buster: bei jedem Frontend-Release hochzählen,
+         sonst zeigt der Browser nach einem Deploy veraltetes JS/CSS. -->
+    <link rel="stylesheet" href="./styles.css?v=7" />
   </head>
   <body>
     <!-- ============================ KOPF ============================ -->
@@ -450,6 +452,6 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=7"></script>
   </body>
 </html>

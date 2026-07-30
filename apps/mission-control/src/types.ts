@@ -174,6 +174,8 @@ export interface GithubJobView {
   status: string;
   conclusion: string | null;
   url: string | null;
+  /** Start-Zeitstempel (ISO) — Basis der Rollback-Phasen-Konvention (CONTRACT §4). */
+  startedAt: string | null;
   /** Ende-Zeitstempel (ISO) — Basis des Nachleucht-Fensters (CONTRACT §4). */
   completedAt: string | null;
   steps: GithubStepView[];

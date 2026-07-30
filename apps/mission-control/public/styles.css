@@ -838,12 +838,18 @@ body {
   font-weight: 800;
   letter-spacing: 0.3px;
 }
-/* LATEST-✓-Karte (neueste promotete Version = Rollback-Ziel) pulsiert rot
-   während eines Rollback-Pulls (§3) */
+/* Fehlgeschlagene Version wird während eines Rollback-Pulls ROT umrahmt (§3) */
 .ghcr-card.glow .ghcr-card-bg {
   stroke: #ff8a97;
   stroke-width: 2.5;
   animation: ghcr-rollback-glow 1.1s ease-in-out infinite;
+}
+/* Rollback-Ziel: LATEST-✓-Karte (neueste promotete Version) pulsiert GRÜN (§3).
+   Nach .glow definiert — falls beides zutrifft (Abnahme/PROD-Edge), gewinnt Grün. */
+.ghcr-card.target-glow .ghcr-card-bg {
+  stroke: var(--success);
+  stroke-width: 2.5;
+  animation: ghcr-rollback-target 1.1s ease-in-out infinite;
 }
 /* Deploy-Lese-Hervorhebung: gerade in eine Umgebung gezogene Version glüht blau */
 .ghcr-card.pull-glow .ghcr-card-bg {
@@ -1400,7 +1406,7 @@ body {
     filter: drop-shadow(0 0 12px var(--run-glow));
   }
 }
-/* LATEST-Karte pulsiert rot (Rollback zieht diese Version) */
+/* Fehlgeschlagene Version pulsiert rot (wird gerade zurückgerollt) */
 @keyframes ghcr-rollback-glow {
   0%,
   100% {
@@ -1408,6 +1414,16 @@ body {
   }
   50% {
     filter: drop-shadow(0 0 14px rgba(239, 71, 87, 0.95));
+  }
+}
+/* Rollback-Ziel (LATEST) pulsiert grün (dieses Image wird wiederhergestellt) */
+@keyframes ghcr-rollback-target {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px var(--success-glow));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px var(--success));
   }
 }
 /* Backup-Stapel glüht rot (Wiederherstellung läuft) */

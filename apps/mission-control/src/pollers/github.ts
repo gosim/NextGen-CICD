@@ -51,6 +51,7 @@ interface ApiJob {
   status: string;
   conclusion: string | null;
   html_url: string | null;
+  started_at?: string | null;
   completed_at?: string | null;
   steps?: ApiStep[];
 }
@@ -246,6 +247,7 @@ function toJobView(job: ApiJob): GithubJobView {
     status: job.status,
     conclusion: job.conclusion,
     url: job.html_url,
+    startedAt: job.started_at ?? null,
     completedAt: job.completed_at ?? null,
     steps: (job.steps ?? []).map((step) => ({
       name: step.name,

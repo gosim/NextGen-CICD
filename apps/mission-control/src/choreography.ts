@@ -31,6 +31,40 @@ function withinAfterglow(completedAt: string | null, nowMs: number): boolean {
   return nowMs - Date.parse(completedAt) <= AFTERGLOW_MS;
 }
 
+/**
+ * Rollback-Phasen-Konvention: Die Jobs-API zeigt den Rollback als EINEN Step,
+ * real läuft aber erst restore.sh (DB aus Dump), dann deploy.sh (Image-Pull).
+ * Die ersten RESTORE_PHASE_MS ab Job-Start erzählen daher NUR den Restore,
+ * danach NUR den Rollback-Pull. Herleitung wie AFTERGLOW_MS: 10 s garantierte
+ * Sichtbarkeit + 5 s Poll-Slack.
+ */
+export const RESTORE_PHASE_MS = 15_000;
+
+/** true, wenn der Backup-Effekt einer Umgebung sichtbar ist (Step läuft oder Nachleuchten). */
+function backupStepVisible(job: GithubJobView, nowMs: number): boolean {
+  return job.steps.some(
+    (step) =>
+      step.name.includes('Datenbank-Backup') &&
+      (step.status === 'in_progress' ||
+        (step.status === 'completed' &&
+          step.conclusion === 'success' &&
+          withinAfterglow(step.completedAt, nowMs))),
+  );
+}
+
+/**
+ * Umgebungen, deren Backup-Erzählung gerade läuft — deren Deploy-Pull wird
+ * unterdrückt (CONTRACT §4: erst sichern, DANN ausrollen).
+ */
+function envsWithVisibleBackup(jobs: GithubJobView[], nowMs: number): Set<EnvKey> {
+  const envs = new Set<EnvKey>();
+  for (const job of jobs) {
+    const { env } = parseJobName(job.name);
+    if (env && backupStepVisible(job, nowMs)) envs.add(env);
+  }
+  return envs;
+}
+
 type JobKind = 'ci-quality' | 'ci-build' | 'deploy' | 'gate' | 'rollback' | 'stability' | 'other';
 
 interface ParsedJob {
@@ -125,6 +159,10 @@ export function deriveChoreography(
   const flows = new Set<FlowId>();
   let alarm: Alarm | null = null;
 
+  // Sequenz-Regel „erst sichern, dann ausrollen": Solange die Backup-Erzählung
+  // einer Umgebung sichtbar ist, wird deren Deploy-Pull unterdrückt (§4).
+  const backupEnvs = envsWithVisibleBackup(input.jobs, nowMs);
+
   for (const job of input.jobs) {
     const jobRunning = job.status === 'in_progress';
     const { env, kind } = parseJobName(job.name);
@@ -142,20 +180,26 @@ export function deriveChoreography(
       // Monitoring — pulsierende Umgebungen würden die Zuschauer irritieren.
       // Sichtbarkeit: Kompaktzeile im Testpanel + Status-Chip im Kopf.
     } else if (kind === 'rollback' && env) {
-      // Rollback zieht das letzte Image von der Stapel-Spitze und die DB aus dem
-      // Backup zurück — daher ghcr aktiv. Der Job kann schnell durchlaufen,
-      // deshalb leuchten die Effekte nach Erfolg noch AFTERGLOW_MS nach —
-      // der Alarm aber NUR solange der Job wirklich läuft.
-      const rollbackVisible =
-        jobRunning ||
-        (job.status === 'completed' &&
-          job.conclusion === 'success' &&
-          withinAfterglow(job.completedAt, nowMs));
-      if (rollbackVisible) {
+      // Rollback in zwei Erzähl-Phasen (RESTORE_PHASE_MS): erst DB aus dem Dump
+      // (restore), dann das grüne Image aus der Registry (rollback-pull) — so
+      // wie restore.sh und deploy.sh auch real nacheinander laufen. Der Job kann
+      // schnell durchlaufen, deshalb leuchtet die Pull-Phase nach Erfolg noch
+      // AFTERGLOW_MS nach — der Alarm aber NUR solange der Job wirklich läuft.
+      const afterglow =
+        job.status === 'completed' &&
+        job.conclusion === 'success' &&
+        withinAfterglow(job.completedAt, nowMs);
+      const startedMs = job.startedAt ? Date.parse(job.startedAt) : Number.NaN;
+      // Ohne brauchbaren Startzeitpunkt defensiv beide Phasen zeigen.
+      const inRestorePhase = jobRunning && !(nowMs - startedMs > RESTORE_PHASE_MS);
+      const inPullPhase = afterglow || (jobRunning && !(nowMs - startedMs <= RESTORE_PHASE_MS));
+      if (inRestorePhase) {
         active.add(`${env}-db`);
         active.add(`backup-${env}`);
-        active.add('ghcr');
         flows.add(`${env}-restore`);
+      }
+      if (inPullPhase) {
+        active.add('ghcr');
         flows.add(`${env}-rollback-pull`);
       }
       if (jobRunning) {
@@ -187,8 +231,13 @@ export function deriveChoreography(
       // (User-Vorgabe: keine überflüssigen Effekte).
       if (!stepRunning) continue;
 
-      if (env && (name.includes('Rolling-Deployment') || name.includes('Stack deployen'))) {
-        // Deploy zieht das Image aus dem GHCR-Stapel in die Env-Box.
+      if (
+        env &&
+        !backupEnvs.has(env) &&
+        (name.includes('Rolling-Deployment') || name.includes('Stack deployen'))
+      ) {
+        // Deploy zieht das Image aus dem GHCR-Stapel in die Env-Box — aber erst,
+        // wenn die Backup-Erzählung dieser Umgebung zu Ende ist (Sequenz-Regel).
         active.add(`${env}-frontend`);
         active.add(`${env}-backend`);
         active.add('ghcr');
