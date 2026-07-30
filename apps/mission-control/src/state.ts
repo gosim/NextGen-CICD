@@ -242,14 +242,17 @@ export class StateStore {
   // ── Choreografie ────────────────────────────────────────────────────────────
 
   private recomputeChoreography(): void {
-    this.snapshot.choreography = deriveChoreography({
-      jobs: this.githubJobs,
-      tests: {
-        active: this.snapshot.tests.active,
-        env: this.snapshot.tests.env,
-        source: this.snapshot.tests.source,
+    this.snapshot.choreography = deriveChoreography(
+      {
+        jobs: this.githubJobs,
+        tests: {
+          active: this.snapshot.tests.active,
+          env: this.snapshot.tests.env,
+          source: this.snapshot.tests.source,
+        },
       },
-    });
+      Date.now(),
+    );
   }
 
   // ── Broadcast (gedrosselt, Leading + Trailing Edge) ─────────────────────────

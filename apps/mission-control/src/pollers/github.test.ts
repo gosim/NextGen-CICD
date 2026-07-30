@@ -21,6 +21,7 @@ function run(overrides: Partial<ApiRun> & { id: number }): ApiRun {
 }
 
 const STABILITY = '.github/workflows/stability-check.yml';
+const ROLLBACK = '.github/workflows/rollback-manual.yml';
 
 describe('chooseRun', () => {
   it('bevorzugt den aktiven Pipeline-Lauf vor allem anderen', () => {
@@ -55,6 +56,28 @@ describe('chooseRun', () => {
       NOW,
     );
     expect(chosen.id).toBe(2);
+  });
+
+  it('bevorzugt einen aktiven manuellen Rollback vor einem aktiven Stabilitäts-Check', () => {
+    const chosen = chooseRun(
+      [
+        run({ id: 1, path: STABILITY, status: 'in_progress', created_at: new Date(NOW).toISOString() }),
+        run({ id: 2, path: ROLLBACK, status: 'in_progress' }),
+      ],
+      NOW,
+    );
+    expect(chosen.id).toBe(2);
+  });
+
+  it('hält einen frisch beendeten manuellen Rollback gegen einen startenden Check (Nachleuchten)', () => {
+    const chosen = chooseRun(
+      [
+        run({ id: 1, path: ROLLBACK }), // vor 30 s erfolgreich beendet
+        run({ id: 2, path: STABILITY, status: 'in_progress', created_at: new Date(NOW).toISOString() }),
+      ],
+      NOW,
+    );
+    expect(chosen.id).toBe(1);
   });
 
   it('fällt auf den neuesten Lauf zurück, wenn nichts aktiv und nichts frisch ist', () => {

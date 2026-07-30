@@ -14,7 +14,7 @@ export type StageStatus =
 
 export type Health = 'up' | 'down';
 
-export type WorkflowKind = 'pipeline' | 'stability';
+export type WorkflowKind = 'pipeline' | 'stability' | 'rollback';
 
 export interface RunInfo {
   id: number;
@@ -165,6 +165,8 @@ export interface GithubStepView {
   name: string;
   status: string;
   conclusion: string | null;
+  /** Ende-Zeitstempel (ISO) — Basis des Nachleucht-Fensters (CONTRACT §4). */
+  completedAt: string | null;
 }
 
 export interface GithubJobView {
@@ -172,6 +174,8 @@ export interface GithubJobView {
   status: string;
   conclusion: string | null;
   url: string | null;
+  /** Ende-Zeitstempel (ISO) — Basis des Nachleucht-Fensters (CONTRACT §4). */
+  completedAt: string | null;
   steps: GithubStepView[];
 }
 

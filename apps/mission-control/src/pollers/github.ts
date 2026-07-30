@@ -1,6 +1,6 @@
 import type { Config } from '../config.js';
 import { parseJobName } from '../choreography.js';
-import { PIPELINE_STAGE_META, STABILITY_STAGE_META } from '../stages.js';
+import { PIPELINE_STAGE_META, ROLLBACK_STAGE_META, STABILITY_STAGE_META } from '../stages.js';
 import type { StateStore } from '../state.js';
 import type {
   EnvKey,
@@ -12,15 +12,16 @@ import type {
 } from '../types.js';
 
 // GitHub-Actions-Poller (alle 5 s, nur mit Token). Ermittelt den relevanten Lauf
-// (pipeline.yml ODER stability-check.yml), dessen Jobs/Steps und wartende Freigaben
-// und leitet daraus die Stages (CONTRACT §1) ab. Bei jedem API-Fehler bleibt der
-// letzte bekannte Zustand erhalten und github.available wird false.
+// (pipeline.yml, stability-check.yml ODER rollback-manual.yml), dessen Jobs/Steps
+// und wartende Freigaben und leitet daraus die Stages (CONTRACT §1) ab. Bei jedem
+// API-Fehler bleibt der letzte bekannte Zustand erhalten und github.available wird false.
 
 const POLL_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 4000;
 const API_BASE = 'https://api.github.com';
 const PIPELINE_PATH = 'pipeline.yml';
 const STABILITY_PATH = 'stability-check.yml';
+const ROLLBACK_PATH = 'rollback-manual.yml';
 
 interface ApiRun {
   id: number;
@@ -42,6 +43,7 @@ interface ApiStep {
   name: string;
   status: string;
   conclusion: string | null;
+  completed_at?: string | null;
 }
 
 interface ApiJob {
@@ -49,6 +51,7 @@ interface ApiJob {
   status: string;
   conclusion: string | null;
   html_url: string | null;
+  completed_at?: string | null;
   steps?: ApiStep[];
 }
 
@@ -127,7 +130,9 @@ export class GithubPoller {
     const stages =
       workflow === 'stability'
         ? buildStabilityStages(jobs)
-        : buildPipelineStages(jobs, pendingApprovals);
+        : workflow === 'rollback'
+          ? buildRollbackStages(jobs)
+          : buildPipelineStages(jobs, pendingApprovals);
 
     this.state.setGithub({ available: true, run, stages, pendingApprovals, jobs });
 
@@ -187,19 +192,23 @@ export class GithubPoller {
 // ── Reine Hilfsfunktionen (rund um die GitHub-Antworten) ─────────────────────
 
 function isRelevantPath(path: string): boolean {
-  return path.endsWith(PIPELINE_PATH) || path.endsWith(STABILITY_PATH);
+  return (
+    path.endsWith(PIPELINE_PATH) || path.endsWith(STABILITY_PATH) || path.endsWith(ROLLBACK_PATH)
+  );
 }
 
 function workflowKindOf(path: string): WorkflowKind {
-  return path.endsWith(STABILITY_PATH) ? 'stability' : 'pipeline';
+  if (path.endsWith(STABILITY_PATH)) return 'stability';
+  if (path.endsWith(ROLLBACK_PATH)) return 'rollback';
+  return 'pipeline';
 }
 
 /**
- * Lauf-Auswahl mit Story-Priorität: Die Pipeline-Erzählung (z. B. rotes Gate +
- * Rollback) darf nicht sofort von einem stündlichen Stabilitäts-Check aus dem
- * Band verdrängt werden.
- *   1. aktiver pipeline-Lauf (queued/in_progress/waiting)
- *   2. kürzlich beendeter pipeline-Lauf (≤ STORY_HOLD_MS)
+ * Lauf-Auswahl mit Story-Priorität: Die Erzähl-Läufe (Pipeline mit rotem Gate +
+ * Auto-Rollback, manueller Rollback) dürfen nicht sofort von einem stündlichen
+ * Stabilitäts-Check aus dem Band verdrängt werden.
+ *   1. aktiver Story-Lauf (pipeline/rollback, queued/in_progress/waiting)
+ *   2. kürzlich beendeter Story-Lauf (≤ STORY_HOLD_MS)
  *   3. aktiver stability-Lauf
  *   4. neuester Lauf
  * (Live-Testfälle eines Checks kommen unabhängig davon über den Ingest-Kanal.)
@@ -211,17 +220,17 @@ export function chooseRun(runs: ApiRun[], now: number = Date.now()): ApiRun {
     (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
   );
   const isActive = (run: ApiRun): boolean => run.status !== 'completed';
-  const isPipeline = (run: ApiRun): boolean => workflowKindOf(run.path) === 'pipeline';
+  const isStory = (run: ApiRun): boolean => workflowKindOf(run.path) !== 'stability';
 
-  const activePipeline = byNewest.find((run) => isActive(run) && isPipeline(run));
-  if (activePipeline) return activePipeline;
+  const activeStory = byNewest.find((run) => isActive(run) && isStory(run));
+  if (activeStory) return activeStory;
 
-  const recentPipeline = byNewest.find(
+  const recentStory = byNewest.find(
     (run) =>
-      isPipeline(run) &&
+      isStory(run) &&
       now - Date.parse(run.updated_at ?? run.created_at) <= STORY_HOLD_MS,
   );
-  if (recentPipeline) return recentPipeline;
+  if (recentStory) return recentStory;
 
   const activeStability = byNewest.find(isActive);
   if (activeStability) return activeStability;
@@ -237,10 +246,12 @@ function toJobView(job: ApiJob): GithubJobView {
     status: job.status,
     conclusion: job.conclusion,
     url: job.html_url,
+    completedAt: job.completed_at ?? null,
     steps: (job.steps ?? []).map((step) => ({
       name: step.name,
       status: step.status,
       conclusion: step.conclusion,
+      completedAt: step.completed_at ?? null,
     })),
   };
 }
@@ -254,6 +265,8 @@ function toRunInfo(run: ApiRun, workflow: WorkflowKind): RunInfo {
     workflow,
     status: mapRunStatus(run.status),
     conclusion: run.conclusion,
+    // Nur Pipeline-Läufe tragen eine Version — beim manuellen Rollback wäre
+    // 1.0.<run_number> die Nummer des Rollback-Workflows, nicht der App.
     version: workflow === 'pipeline' ? `1.0.${run.run_number}` : null,
     startedAt: run.run_started_at || run.created_at,
   };
@@ -395,6 +408,18 @@ function buildPipelineStages(jobs: GithubJobView[], pendingApprovals: string[]):
     approvalStage('prod-approval', 'prod'),
     deployStage('prod-deploy', 'prod'),
   ];
+}
+
+/** Manueller Rollback: ein einzelner Job (`Rollback <env>`) → eine Band-Stage. */
+function buildRollbackStages(jobs: GithubJobView[]): Stage[] {
+  const entry = parseJobs(jobs).find((item) => item.kind === 'rollback');
+  return ROLLBACK_STAGE_META.map((meta) => ({
+    key: meta.key,
+    label: entry?.env ? `${meta.label} ${entry.env.toUpperCase()}` : meta.label,
+    status: entry ? jobToStageStatus(entry.job) : 'idle',
+    currentStep: entry ? currentStepOf(entry.job) : null,
+    url: entry?.job.url ?? null,
+  }));
 }
 
 function buildStabilityStages(jobs: GithubJobView[]): Stage[] {

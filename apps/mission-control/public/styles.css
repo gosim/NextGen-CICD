@@ -838,11 +838,12 @@ body {
   font-weight: 800;
   letter-spacing: 0.3px;
 }
-/* Band-Spitze (neueste Karte) glüht während eines Rollback-Pulls (§3) */
+/* LATEST-✓-Karte (neueste promotete Version = Rollback-Ziel) pulsiert rot
+   während eines Rollback-Pulls (§3) */
 .ghcr-card.glow .ghcr-card-bg {
   stroke: #ff8a97;
   stroke-width: 2.5;
-  filter: drop-shadow(0 0 8px rgba(239, 71, 87, 0.8));
+  animation: ghcr-rollback-glow 1.1s ease-in-out infinite;
 }
 /* Deploy-Lese-Hervorhebung: gerade in eine Umgebung gezogene Version glüht blau */
 .ghcr-card.pull-glow .ghcr-card-bg {
@@ -1397,6 +1398,16 @@ body {
   }
   50% {
     filter: drop-shadow(0 0 12px var(--run-glow));
+  }
+}
+/* LATEST-Karte pulsiert rot (Rollback zieht diese Version) */
+@keyframes ghcr-rollback-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(239, 71, 87, 0.65));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(239, 71, 87, 0.95));
   }
 }
 /* Backup-Stapel glüht rot (Wiederherstellung läuft) */

@@ -21,6 +21,9 @@ export const PIPELINE_STAGE_META: readonly StageMeta[] = [
   { key: 'prod-deploy', label: '🚀 PROD' },
 ];
 
+/** 1 Stage für den manuellen Rollback (rollback-manual.yml, ein einzelner Job). */
+export const ROLLBACK_STAGE_META: readonly StageMeta[] = [{ key: 'rollback', label: '⛑ Rollback' }];
+
 /** 3 Check-Stages für Stabilitäts-Läufe. */
 export const STABILITY_STAGE_META: readonly StageMeta[] = [
   { key: 'int-check', label: '🔍 INT' },

@@ -2,16 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { deriveChoreography, parseJobName, type ChoreographyInput } from './choreography.js';
 import type { GithubJobView, GithubStepView } from './types.js';
 
-function step(name: string, status = 'in_progress'): GithubStepView {
-  return { name, status, conclusion: status === 'completed' ? 'success' : null };
+function step(
+  name: string,
+  status = 'in_progress',
+  extra: Partial<GithubStepView> = {},
+): GithubStepView {
+  return {
+    name,
+    status,
+    conclusion: status === 'completed' ? 'success' : null,
+    completedAt: null,
+    ...extra,
+  };
 }
 
 function job(
   name: string,
   status: string,
   steps: GithubStepView[] = [],
+  extra: Partial<GithubJobView> = {},
 ): GithubJobView {
-  return { name, status, conclusion: null, url: `https://ci/${name}`, steps };
+  return {
+    name,
+    status,
+    conclusion: null,
+    url: `https://ci/${name}`,
+    completedAt: null,
+    steps,
+    ...extra,
+  };
 }
 
 function input(jobs: GithubJobView[], tests?: ChoreographyInput['tests']): ChoreographyInput {
@@ -35,6 +54,12 @@ describe('parseJobName', () => {
     expect(parseJobName('🔍 INT')).toEqual({ env: 'int', kind: 'stability' });
     expect(parseJobName('🔍 Abnahme')).toEqual({ env: 'abnahme', kind: 'stability' });
     expect(parseJobName('🔍 PROD')).toEqual({ env: 'prod', kind: 'stability' });
+  });
+
+  it('erkennt den manuellen Rollback-Job ("Rollback <env>", ohne Separator)', () => {
+    expect(parseJobName('Rollback int')).toEqual({ env: 'int', kind: 'rollback' });
+    expect(parseJobName('Rollback abnahme')).toEqual({ env: 'abnahme', kind: 'rollback' });
+    expect(parseJobName('Rollback prod')).toEqual({ env: 'prod', kind: 'rollback' });
   });
 });
 
@@ -195,5 +220,119 @@ describe('deriveChoreography', () => {
     );
     // int-db kommt aus Backup UND Gate — darf nur einmal auftauchen.
     expect(result.active.filter((c) => c === 'int-db')).toHaveLength(1);
+  });
+});
+
+// ── Nachleucht-Fenster (AFTERGLOW_MS): kurzlebige Effekte bleiben ≥10 s sichtbar ──
+
+describe('deriveChoreography — Nachleuchten', () => {
+  const NOW = Date.parse('2026-07-30T12:00:00Z');
+  const secondsAgo = (s: number): string => new Date(NOW - s * 1000).toISOString();
+
+  it('Backup-Step vor 5 s erfolgreich beendet → Effekte leuchten nach, kein Alarm', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed', {
+            completedAt: secondsAgo(5),
+          }),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int']));
+    expect(result.flows).toContain('int-backup');
+    expect(result.alarm).toBeNull();
+  });
+
+  it('Backup-Step vor 20 s beendet → Fenster abgelaufen, keine Effekte', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed', {
+            completedAt: secondsAgo(20),
+          }),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).not.toContain('int-backup');
+  });
+
+  it('übersprungener Backup-Step (conclusion=skipped) leuchtet NICHT nach', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed', {
+            conclusion: 'skipped',
+            completedAt: secondsAgo(3),
+          }),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).not.toContain('int-backup');
+  });
+
+  it('Backup-Step completed ohne Zeitstempel → defensiv keine Effekte', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Datenbank-Backup (pg_dump) vor dem Deployment', 'completed'),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result.flows).not.toContain('int-backup');
+  });
+
+  it('Rollback-Job vor 8 s erfolgreich beendet → Restore/Pull leuchten nach, Alarm ist AUS', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / ⛑ Rollback', 'completed', [], {
+          conclusion: 'success',
+          completedAt: secondsAgo(8),
+        }),
+      ]),
+      NOW,
+    );
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int', 'ghcr']));
+    expect(result.flows).toEqual(expect.arrayContaining(['int-restore', 'int-rollback-pull']));
+    // „Rollback läuft" wäre nach Abschluss eine Falschaussage.
+    expect(result.alarm).toBeNull();
+  });
+
+  it('fehlgeschlagener Rollback-Job leuchtet NICHT nach', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / ⛑ Rollback', 'completed', [], {
+          conclusion: 'failure',
+          completedAt: secondsAgo(3),
+        }),
+      ]),
+      NOW,
+    );
+    expect(result).toEqual({ active: [], flows: [], alarm: null });
+  });
+
+  it('manueller Rollback-Job ("Rollback int") läuft → volle Effekte + Alarm', () => {
+    const result = deriveChoreography(input([job('Rollback int', 'in_progress')]), NOW);
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int', 'ghcr']));
+    expect(result.flows).toEqual(expect.arrayContaining(['int-restore', 'int-rollback-pull']));
+    expect(result.alarm).toEqual({ env: 'int', reason: 'Rollback läuft' });
+  });
+
+  it('Regressionsschutz: beendeter Deploy-Step leuchtet NICHT nach (nur Backup/Rollback)', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [
+          step('Rolling-Deployment: v1.0.28 → int', 'completed', {
+            completedAt: secondsAgo(3),
+          }),
+        ]),
+      ]),
+      NOW,
+    );
+    expect(result).toEqual({ active: [], flows: [], alarm: null });
   });
 });

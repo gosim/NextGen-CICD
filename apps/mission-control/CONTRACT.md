@@ -76,22 +76,24 @@ Die drei Env-Boxen sind als Promotionskette links→rechts angeordnet: INT → A
 
 ## 3. FlowIds (animierte Datenflüsse, v2)
 
-`ci-build` (github-ci→Geister-Karte auf der ghcr-Stapel-Spitze) · `<env>-pull` (ghcr-Stapel→Env-Box) · `<env>-backup` (kurzer vertikaler Fluss db→eigener Dump-Stapel darunter) · `<env>-test` (playwright→Env-Box) · `<env>-restore` (eigener Dump-Stapel→db, ROT, kurz vertikal; Karte glüht) · `<env>-rollback-pull` (ghcr-Stapel-SPITZE→Env-Box; die oberste Karte glüht dabei) · `registry-push` (INT-Gate/Env→ghcr-Stapel-Spitze — „Image hat die Gates bestanden und landet oben auf dem Stapel") · `promote-int-abnahme` / `promote-abnahme-prod` (Kettenpfeile, animiert wenn die Folgestufe deployt).
+`ci-build` (github-ci→Geister-Karte auf der ghcr-Stapel-Spitze) · `<env>-pull` (ghcr-Stapel→Env-Box) · `<env>-backup` (kurzer vertikaler Fluss db→eigener Dump-Stapel darunter) · `<env>-test` (playwright→Env-Box) · `<env>-restore` (eigener Dump-Stapel→db, ROT, kurz vertikal; Karte glüht) · `<env>-rollback-pull` (ghcr-Stapel→Env-Box; dabei pulsiert die LATEST-✓-Karte — die neueste promotete Version ist das Rollback-Ziel, NICHT die Stapel-Spitze mit der fehlgeschlagenen Version. Bewusste Vereinfachung: sicher korrekt für INT-Rollbacks, den Demo-Pfad; bei Abnahme/PROD kann die fehlgeschlagene Version selbst schon INT-promotet sein) · `registry-push` (INT-Gate/Env→ghcr-Stapel-Spitze — „Image hat die Gates bestanden und landet oben auf dem Stapel") · `promote-int-abnahme` / `promote-abnahme-prod` (Kettenpfeile, animiert wenn die Folgestufe deployt).
 
 ## 4. Choreografie-Ableitung (Server, aus GitHub-Job-/Step-Namen)
 
-Job-Namen kommen als `"<Stage> / <Jobname>"` (z. B. `"INT / 🚀 Deploy"`). Stage-Präfixe: `CI`, `INT`, `Abnahme`, `PROD`, `🔍 INT|Abnahme|PROD` (Stability). Step-Name-Substrings (deutsch, exakt aus unseren Workflows) → Choreografie:
+Job-Namen kommen als `"<Stage> / <Jobname>"` (z. B. `"INT / 🚀 Deploy"`). Stage-Präfixe: `CI`, `INT`, `Abnahme`, `PROD`, `🔍 INT|Abnahme|PROD` (Stability), `Rollback <env>` (manueller Rollback, rollback-manual.yml — eigener Lauf mit einer einzelnen `⛑ Rollback`-Band-Stage). Step-Name-Substrings (deutsch, exakt aus unseren Workflows) → Choreografie:
 
 | Job/Step enthält | active | flows |
 |---|---|---|
 | Job `🧪` oder `📦` (running) | `github-ci` (+`ghcr` bei 📦) | `ci-build` bei 📦 |
 | Step `Letzte grüne Version` / `GHCR-Login` / `State & Ops-Event` | — (bewusst effektfrei, Verwaltungsrauschen) | — |
-| Step `Datenbank-Backup` | `<env>-db`, `backup-<env>` | `<env>-backup` |
+| Step `Datenbank-Backup` (running ODER Nachleuchten, s. u.) | `<env>-db`, `backup-<env>` | `<env>-backup` |
 | Step `Rolling-Deployment` / `Stack deployen` | `<env>-frontend`, `<env>-backend`, `ghcr` | `<env>-pull`; zusätzlich `promote-int-abnahme` wenn env=abnahme bzw. `promote-abnahme-prod` wenn env=prod |
 | Job `🛡 Quality Gate` bzw. `🔍`-Job running (Test-Steps) | `playwright`, `<env>-frontend`, `<env>-backend`, `<env>-db` | `<env>-test` |
 | Step `Promote` (im Gate-Job, nach grünen Tests) | `ghcr` | `registry-push` |
-| Job `⛑ Rollback` running | `<env>-db`, `backup-<env>`, `ghcr` | `<env>-restore`, `<env>-rollback-pull` + `alarm={env}` |
+| Job `⛑ Rollback` / `Rollback <env>` (running ODER Nachleuchten) | `<env>-db`, `backup-<env>`, `ghcr` | `<env>-restore`, `<env>-rollback-pull`; `alarm={env}` NUR solange der Job läuft |
 | Run `waiting` + pending approval | — (Stage-Status `waiting` reicht; ⏸ auf dem Kettenpfeil pulsiert) | — |
+
+**Nachleucht-Fenster (`AFTERGLOW_MS` = 15 s):** Backup-Step und Rollback-Jobs erzeugen ihre Effekte auch noch, wenn sie vor ≤ 15 s ERFOLGREICH endeten (`completed_at`, conclusion=success — skipped zählt nicht). Grund: Ein pg_dump von 2–3 s läge sonst komplett zwischen zwei 5-s-Polls und würde nie sichtbar; so sind Backup/Restore garantiert ≥ 10 s zu sehen (15 s Fenster − 5 s Poll-Slack; typisch 15–20 s inkl. Broadcast-Drossel). Der Alarm-Banner nimmt am Nachleuchten NICHT teil („Rollback läuft" wäre nach Abschluss falsch). Alle übrigen Effekte bleiben strikt an laufende Jobs/Steps gebunden. Annahme: NTP-synchrone Host-Uhr (Vergleich GitHub-Serverzeit ↔ lokale Uhr).
 
 ## 5. Test-Ingest: `POST /events/test` (vom Playwright-Live-Reporter)
 

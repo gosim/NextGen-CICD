@@ -16,6 +16,21 @@ export interface ChoreographyInput {
   tests: { active: boolean; env: EnvKey | null; source: string | null };
 }
 
+/**
+ * Nachleucht-Fenster für kurzlebige Effekte (Backup-Step, Rollback-Job):
+ * 10 s Mindest-Sichtbarkeit + 5 s Poll-Slack (POLL_INTERVAL_MS im GitHub-Poller).
+ * Ein pg_dump von 2–3 s liegt sonst komplett zwischen zwei Polls und würde nie
+ * sichtbar. Verankert an `completed_at` (GitHub-Serverzeit) gegen lokale Uhr —
+ * setzt eine NTP-synchrone Host-Uhr voraus (Drift ≫ 15 s kippt die Erkennung).
+ */
+export const AFTERGLOW_MS = 15_000;
+
+/** true, wenn `completedAt` gesetzt und höchstens AFTERGLOW_MS her ist (NaN → false). */
+function withinAfterglow(completedAt: string | null, nowMs: number): boolean {
+  if (!completedAt) return false;
+  return nowMs - Date.parse(completedAt) <= AFTERGLOW_MS;
+}
+
 type JobKind = 'ci-quality' | 'ci-build' | 'deploy' | 'gate' | 'rollback' | 'stability' | 'other';
 
 interface ParsedJob {
@@ -59,6 +74,12 @@ export function parseJobName(name: string): ParsedJob {
     return { env: labelToEnv(trimmed.slice('🔍'.length)), kind: 'stability' };
   }
 
+  // Manueller Rollback (rollback-manual.yml): "Rollback int" — ohne " / "-Separator.
+  const manualRollback = /^Rollback\s+(\S+)$/i.exec(trimmed);
+  if (manualRollback) {
+    return { env: labelToEnv(manualRollback[1]!), kind: 'rollback' };
+  }
+
   const sep = trimmed.indexOf(' / ');
   const stage = sep >= 0 ? trimmed.slice(0, sep) : trimmed;
   const job = sep >= 0 ? trimmed.slice(sep + 3) : '';
@@ -96,22 +117,25 @@ function promoteFlow(env: EnvKey): FlowId | null {
  * Komponenten pulsieren, welche Flüsse animiert werden und ob ein Alarm anliegt.
  * Reine Funktion (CONTRACT §4).
  */
-export function deriveChoreography(input: ChoreographyInput): ChoreographyState {
+export function deriveChoreography(
+  input: ChoreographyInput,
+  nowMs: number = Date.now(),
+): ChoreographyState {
   const active = new Set<ComponentId>();
   const flows = new Set<FlowId>();
   let alarm: Alarm | null = null;
 
   for (const job of input.jobs) {
-    if (job.status !== 'in_progress') continue;
+    const jobRunning = job.status === 'in_progress';
     const { env, kind } = parseJobName(job.name);
 
-    if (kind === 'ci-quality') {
+    if (kind === 'ci-quality' && jobRunning) {
       active.add('github-ci');
-    } else if (kind === 'ci-build') {
+    } else if (kind === 'ci-build' && jobRunning) {
       active.add('github-ci');
       active.add('ghcr');
       flows.add('ci-build');
-    } else if (kind === 'gate' && env) {
+    } else if (kind === 'gate' && env && jobRunning) {
       lightTestPath(env, active, flows);
     } else if (kind === 'stability') {
       // Bewusst KEINE Karten-Effekte: Der stündliche Check ist Hintergrund-
@@ -119,26 +143,49 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
       // Sichtbarkeit: Kompaktzeile im Testpanel + Status-Chip im Kopf.
     } else if (kind === 'rollback' && env) {
       // Rollback zieht das letzte Image von der Stapel-Spitze und die DB aus dem
-      // Backup zurück — daher ghcr aktiv.
-      active.add(`${env}-db`);
-      active.add(`backup-${env}`);
-      active.add('ghcr');
-      flows.add(`${env}-restore`);
-      flows.add(`${env}-rollback-pull`);
-      alarm = { env, reason: 'Rollback läuft' };
+      // Backup zurück — daher ghcr aktiv. Der Job kann schnell durchlaufen,
+      // deshalb leuchten die Effekte nach Erfolg noch AFTERGLOW_MS nach —
+      // der Alarm aber NUR solange der Job wirklich läuft.
+      const rollbackVisible =
+        jobRunning ||
+        (job.status === 'completed' &&
+          job.conclusion === 'success' &&
+          withinAfterglow(job.completedAt, nowMs));
+      if (rollbackVisible) {
+        active.add(`${env}-db`);
+        active.add(`backup-${env}`);
+        active.add('ghcr');
+        flows.add(`${env}-restore`);
+        flows.add(`${env}-rollback-pull`);
+      }
+      if (jobRunning) {
+        alarm = { env, reason: 'Rollback läuft' };
+      }
     }
 
     // Step-Ebene: nur laufende Steps zählen. Step-Substrings exakt aus unseren
     // Composite-Actions (deploy-stack). Env stammt aus dem übergeordneten Job.
     for (const step of job.steps) {
-      if (step.status !== 'in_progress') continue;
+      const stepRunning = step.status === 'in_progress';
       const name = step.name;
 
-      if (env && name.includes('Datenbank-Backup')) {
+      // Backup (pg_dump) dauert nur Sekunden und läge sonst oft komplett
+      // zwischen zwei Polls → Nachleucht-Fenster. conclusion==='success' ist
+      // zwingend: übersprungene Steps tragen ebenfalls ein completed_at.
+      const backupVisible =
+        stepRunning ||
+        (step.status === 'completed' &&
+          step.conclusion === 'success' &&
+          withinAfterglow(step.completedAt, nowMs));
+      if (env && backupVisible && name.includes('Datenbank-Backup')) {
         active.add(`${env}-db`);
         active.add(`backup-${env}`);
         flows.add(`${env}-backup`);
       }
+
+      // Alle übrigen Step-Effekte bewusst strikt an laufende Steps gebunden
+      // (User-Vorgabe: keine überflüssigen Effekte).
+      if (!stepRunning) continue;
 
       if (env && (name.includes('Rolling-Deployment') || name.includes('Stack deployen'))) {
         // Deploy zieht das Image aus dem GHCR-Stapel in die Env-Box.
