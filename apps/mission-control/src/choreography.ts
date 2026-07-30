@@ -1,4 +1,11 @@
-import type { Alarm, ChoreographyState, EnvKey, GithubJobView } from './types.js';
+import type {
+  Alarm,
+  ChoreographyState,
+  ComponentId,
+  EnvKey,
+  FlowId,
+  GithubJobView,
+} from './types.js';
 
 // Ableitung der Architektur-Karten-Choreografie (CONTRACT §4) aus den GitHub-Job-
 // und Step-Namen plus dem Live-Test-Signal. BEWUSST eine reine Funktion: keine
@@ -65,14 +72,23 @@ export function parseJobName(name: string): ParsedJob {
   return { env, kind: 'other' };
 }
 
-/** Aktiviert Playwright + Backend-Kette + Test-Flow einer Umgebung. */
-function lightTestPath(env: EnvKey, active: Set<string>, flows: Set<string>): void {
+/** Aktiviert Playwright + Frontend/Backend/DB + Test-Flow einer Umgebung (CONTRACT §4). */
+function lightTestPath(env: EnvKey, active: Set<ComponentId>, flows: Set<FlowId>): void {
   active.add('playwright');
-  active.add(`${env}-proxy`);
-  active.add(`${env}-be-1`);
-  active.add(`${env}-be-2`);
+  active.add(`${env}-frontend`);
+  active.add(`${env}-backend`);
   active.add(`${env}-db`);
   flows.add(`${env}-test`);
+}
+
+/**
+ * Kettenpfeil-Flow der Promotion: nur die Folgestufe wird „vorwärts" befördert.
+ * INT ist der Einstieg und hat keinen eingehenden Promote-Flow.
+ */
+function promoteFlow(env: EnvKey): FlowId | null {
+  if (env === 'abnahme') return 'promote-int-abnahme';
+  if (env === 'prod') return 'promote-abnahme-prod';
+  return null;
 }
 
 /**
@@ -81,8 +97,8 @@ function lightTestPath(env: EnvKey, active: Set<string>, flows: Set<string>): vo
  * Reine Funktion (CONTRACT §4).
  */
 export function deriveChoreography(input: ChoreographyInput): ChoreographyState {
-  const active = new Set<string>();
-  const flows = new Set<string>();
+  const active = new Set<ComponentId>();
+  const flows = new Set<FlowId>();
   let alarm: Alarm | null = null;
 
   for (const job of input.jobs) {
@@ -98,9 +114,11 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
     } else if ((kind === 'gate' || kind === 'stability') && env) {
       lightTestPath(env, active, flows);
     } else if (kind === 'rollback' && env) {
+      // Rollback zieht das letzte Image von der Stapel-Spitze und die DB aus dem
+      // Backup zurück — daher ghcr (statt runner) aktiv.
       active.add(`${env}-db`);
       active.add('backup-store');
-      active.add('runner');
+      active.add('ghcr');
       flows.add(`${env}-restore`);
       flows.add(`${env}-rollback-pull`);
       alarm = { env, reason: 'Rollback läuft' };
@@ -127,14 +145,21 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
       }
 
       if (env && (name.includes('Rolling-Deployment') || name.includes('Stack deployen'))) {
-        active.add(`${env}-proxy`);
-        active.add(`${env}-fe-1`);
-        active.add(`${env}-fe-2`);
-        active.add(`${env}-be-1`);
-        active.add(`${env}-be-2`);
-        active.add(`${env}-migrate`);
+        // Deploy zieht das Image aus dem GHCR-Stapel in die Env-Box.
+        active.add(`${env}-frontend`);
+        active.add(`${env}-backend`);
+        active.add('ghcr');
         flows.add(`${env}-pull`);
-        flows.add(`${env}-migrate`);
+        // Kettenpfeil-Promotion animiert, sobald die Folgestufe deployt.
+        const promote = promoteFlow(env);
+        if (promote) flows.add(promote);
+      }
+
+      // Promote-Step im Gate-Job (nach grünen Tests): Das Image hat die Gates
+      // bestanden und landet oben auf dem GHCR-Stapel.
+      if (kind === 'gate' && name.includes('Promote')) {
+        active.add('ghcr');
+        flows.add('registry-push');
       }
     }
   }

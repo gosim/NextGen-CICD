@@ -41,6 +41,9 @@ Verbindlich für alle drei Bausteine. Änderungen nur mit Anpassung aller Konsum
     "flows": ["int-backup"],                 // FlowIds, deren Punkte-Animation läuft
     "alarm": null | { "env": "int", "reason": "Rollback läuft" }  // roter Alarm-Rahmen um die Env-Box
   },
+  "registry": {
+    "images": [ { "version": "1.0.18", "imageTag": "sha-ebbc70c" } ]   // letzte 3 gebaute Versionen, neueste zuerst
+  },
   "environments": {
     "int":     { "health": "up"|"down", "version": "1.0.15", "gitSha": "sha-…", "demoBug": "none", "instances": ["abc123","def456"] },
     "abnahme": { … }, "prod": { … }
@@ -55,14 +58,15 @@ Verbindlich für alle drei Bausteine. Änderungen nur mit Anpassung aller Konsum
 }
 ```
 
-## 2. ComponentIds (Architektur-Karte)
+## 2. ComponentIds (Architektur-Karte, v2 — bewusst vereinfachte Zuschauer-Sicht)
 
-Global: `github-ci`, `ghcr`, `runner`, `backup-store`, `playwright`.
-Je Umgebung (`int` | `abnahme` | `prod`): `<env>-proxy`, `<env>-fe-1`, `<env>-fe-2`, `<env>-be-1`, `<env>-be-2`, `<env>-db`, `<env>-migrate`.
+Global: `github-ci`, `ghcr` (Image-STAPEL, letzte 3 Versionen als Karten), `runner`, `backup-store`, `playwright`.
+Je Umgebung (`int` | `abnahme` | `prod`): `<env>-frontend`, `<env>-backend`, `<env>-db`.
+Die drei Env-Boxen sind als Promotionskette links→rechts angeordnet: INT → Abnahme → PROD, verbunden über Kettenpfeile mit ⏸-Freigabe-Symbol.
 
-## 3. FlowIds (animierte Datenflüsse)
+## 3. FlowIds (animierte Datenflüsse, v2)
 
-`ci-build` (github-ci→ghcr) · `<env>-pull` (ghcr→Env-Box) · `<env>-migrate` (migrate→db) · `<env>-backup` (db→backup-store) · `<env>-test` (playwright→proxy→be→db) · `<env>-restore` (backup-store→db, rot) · `<env>-rollback-pull` (runner→Env-Box).
+`ci-build` (github-ci→ghcr-Stapel) · `<env>-pull` (ghcr-Stapel→Env-Box) · `<env>-backup` (db→backup-store) · `<env>-test` (playwright→Env-Box) · `<env>-restore` (backup-store→db, ROT) · `<env>-rollback-pull` (ghcr-Stapel-SPITZE→Env-Box; die oberste Karte glüht dabei) · `registry-push` (INT-Gate/Env→ghcr-Stapel-Spitze — „Image hat die Gates bestanden und landet oben auf dem Stapel") · `promote-int-abnahme` / `promote-abnahme-prod` (Kettenpfeile, animiert wenn die Folgestufe deployt).
 
 ## 4. Choreografie-Ableitung (Server, aus GitHub-Job-/Step-Namen)
 
@@ -73,10 +77,11 @@ Job-Namen kommen als `"<Stage> / <Jobname>"` (z. B. `"INT / 🚀 Deploy"`). Stag
 | Job `🧪` oder `📦` (running) | `github-ci` (+`ghcr` bei 📦) | `ci-build` bei 📦 |
 | Step `Letzte grüne Version` / `GHCR-Login` / `State & Ops-Event` | `runner` | — |
 | Step `Datenbank-Backup` | `<env>-db`, `backup-store` | `<env>-backup` |
-| Step `Rolling-Deployment` / `Stack deployen` | `<env>-proxy`, alle `<env>-fe/be`, `<env>-migrate` | `<env>-pull`, `<env>-migrate` |
-| Job `🛡 Quality Gate` bzw. `🔍`-Job running | `playwright`, `<env>-proxy`, `<env>-be-*`, `<env>-db` | `<env>-test` |
-| Job `⛑ Rollback` running | `<env>-db`, `backup-store`, `runner` | `<env>-restore`, `<env>-rollback-pull` + `alarm={env}` |
-| Run `waiting` + pending approval | — (Stage-Status `waiting` reicht) | — |
+| Step `Rolling-Deployment` / `Stack deployen` | `<env>-frontend`, `<env>-backend`, `ghcr` | `<env>-pull`; zusätzlich `promote-int-abnahme` wenn env=abnahme bzw. `promote-abnahme-prod` wenn env=prod |
+| Job `🛡 Quality Gate` bzw. `🔍`-Job running (Test-Steps) | `playwright`, `<env>-frontend`, `<env>-backend`, `<env>-db` | `<env>-test` |
+| Step `Promote` (im Gate-Job, nach grünen Tests) | `ghcr` | `registry-push` |
+| Job `⛑ Rollback` running | `<env>-db`, `backup-store`, `ghcr` | `<env>-restore`, `<env>-rollback-pull` + `alarm={env}` |
+| Run `waiting` + pending approval | — (Stage-Status `waiting` reicht; ⏸ auf dem Kettenpfeil pulsiert) | — |
 
 ## 5. Test-Ingest: `POST /events/test` (vom Playwright-Live-Reporter)
 

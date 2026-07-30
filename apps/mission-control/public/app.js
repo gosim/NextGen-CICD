@@ -86,6 +86,7 @@ const el = {
   testPanel: document.getElementById('test-panel'),
   testTitle: document.getElementById('test-title'),
   testProgress: document.getElementById('test-progress'),
+  testCompact: document.getElementById('test-compact'),
   testList: document.getElementById('test-list'),
   map: document.getElementById('arch-map'),
   flowDotsLayer: document.getElementById('flow-dots-layer'),
@@ -241,30 +242,54 @@ el.pipeline.addEventListener('click', (e) => {
 // --------------------------------------------------------------------------
 const TC_SYMBOL = { passed: '✓', failed: '✗', flaky: '⚠', skipped: '–' };
 
+/** Nur diese Suite bekommt die aufgeschlüsselte Einzeltest-Liste. */
+const DETAIL_SUITE = 'int-regression';
+
+/** Anzeige-Namen der Suiten (CONTRACT §5 project). */
+const SUITE_LABEL = {
+  'int-regression': 'INT-Regression',
+  abnahme: 'Abnahme',
+  smoke: 'Smoke',
+  quarantine: 'Quarantäne',
+};
+
 function renderTests(tests) {
   const cases = Array.isArray(tests?.cases) ? tests.cases : [];
   const visible = !!(tests?.active || cases.length);
   el.testPanel.hidden = !visible;
   if (!visible) {
     el.testList.textContent = '';
+    el.testCompact.hidden = true;
     return;
   }
 
-  // Titel
-  if (tests.source === 'stability') {
-    el.testTitle.textContent = '🔍 Stabilitäts-Check';
-  } else {
-    const suite = tests.suite || 'Regression';
-    const env = tests.env ? tests.env.toUpperCase() : '—';
-    el.testTitle.textContent = `🛡 Quality Gate: ${suite} gegen ${env}`;
-  }
-
-  // Fortschritt
   const total = tests.summary?.total ?? cases.length;
   const done = cases.filter((c) => c.status && c.status !== 'running').length;
-  el.testProgress.textContent = `${done}/${total}`;
+  const detailed = tests.suite === DETAIL_SUITE;
 
-  // Liste reconcilen (Reihenfolge = Datenreihenfolge)
+  if (detailed) {
+    // Volle Einzeltest-Liste (nur int-regression)
+    if (tests.source === 'stability') {
+      el.testTitle.textContent = '🔍 Stabilitäts-Check';
+    } else {
+      const suite = SUITE_LABEL[tests.suite] || tests.suite;
+      const env = tests.env ? tests.env.toUpperCase() : '—';
+      el.testTitle.textContent = `🛡 Quality Gate: ${suite} gegen ${env}`;
+    }
+    el.testProgress.textContent = `${done}/${total}`;
+    el.testCompact.hidden = true;
+    renderTestList(cases);
+  } else {
+    // Kompaktzeile statt Einzeltests (abnahme / smoke / quarantine)
+    el.testTitle.textContent = tests.source === 'stability' ? '🔍 Stabilitäts-Check' : '🛡 Quality Gate';
+    el.testProgress.textContent = '';
+    el.testList.textContent = '';
+    renderTestCompact(tests);
+  }
+}
+
+/** Einzeltest-Liste reconcilen (Reihenfolge = Datenreihenfolge). */
+function renderTestList(cases) {
   const seen = new Set();
   cases.forEach((c) => {
     seen.add(c.id);
@@ -288,6 +313,59 @@ function renderTests(tests) {
   el.testList.querySelectorAll('.test-case').forEach((li) => {
     if (!seen.has(li.dataset.id)) li.remove();
   });
+}
+
+/**
+ * Kompaktzeile für Nicht-Regression-Suiten: „🛡 <Suite> gegen <ENV>: n/total"
+ * — Gesamt-Spinner solange aktiv, danach ✓ grün / ✗ rot (+k flaky gelb).
+ * Keine Einzel-Einträge, keine Slide-Effekte.
+ */
+function renderTestCompact(tests) {
+  const s = tests.summary || {};
+  const total = s.total ?? 0;
+  const passed = s.passed ?? 0;
+  const failed = s.failed ?? 0;
+  const flaky = s.flaky ?? 0;
+  const active = !!tests.active;
+  const suiteLabel = SUITE_LABEL[tests.suite] || tests.suite || 'Suite';
+  const env = tests.env ? tests.env.toUpperCase() : '—';
+
+  el.testCompact.hidden = false;
+  el.testCompact.dataset.state = active ? 'active' : failed > 0 ? 'fail' : 'ok';
+  el.testCompact.textContent = '';
+
+  const shield = document.createElement('span');
+  shield.className = 'tcx-shield';
+  shield.setAttribute('aria-hidden', 'true');
+  shield.textContent = '🛡';
+
+  const label = document.createElement('span');
+  label.className = 'tcx-label';
+  label.textContent = `${suiteLabel} gegen ${env}:`;
+
+  const count = document.createElement('span');
+  count.className = 'tcx-count';
+  count.textContent = `${passed}/${total}`;
+
+  el.testCompact.append(shield, label, count);
+
+  if (active) {
+    const spin = document.createElement('span');
+    spin.className = 'tcx-spin';
+    spin.setAttribute('aria-hidden', 'true');
+    el.testCompact.append(spin);
+  } else {
+    const res = document.createElement('span');
+    res.className = 'tcx-res ' + (failed > 0 ? 'fail' : 'ok');
+    res.textContent = failed > 0 ? '✗' : '✓';
+    el.testCompact.append(res);
+    if (flaky > 0) {
+      const fl = document.createElement('span');
+      fl.className = 'tcx-flaky';
+      fl.textContent = `+${flaky} flaky`;
+      el.testCompact.append(fl);
+    }
+  }
 }
 
 /** @param {HTMLElement} li */
@@ -364,7 +442,12 @@ function renderMap(state) {
   });
   syncFlowDots(flows);
 
-  // 3) Umgebungen: Health, Instanz-Punkte, Versions-Badge
+  // 2b) Während eines Rollback-Pulls glüht die Stapel-Spitze (§3)
+  const rollbackActive = [...flows].some((f) => f.endsWith('rollback-pull'));
+  const topCard = document.getElementById('ghcr-card-0');
+  if (topCard) topCard.classList.toggle('glow', rollbackActive);
+
+  // 3) Umgebungen: Health-Punkt, Versions-Badge
   const environments = state.environments || {};
   ENVS.forEach((env) => {
     const data = environments[env];
@@ -407,6 +490,18 @@ function renderMap(state) {
   } else {
     el.alarmBanner.hidden = true;
   }
+
+  // 5) Freigabe-Symbole auf den Kettenpfeilen pulsieren, wenn die Stage wartet
+  const stages = Array.isArray(state.github?.stages) ? state.github.stages : [];
+  const stageStatus = (key) => stages.find((st) => st.key === key)?.status;
+  const approvalWait = {
+    'approval-int-abnahme': stageStatus('abnahme-approval') === 'waiting',
+    'approval-abnahme-prod': stageStatus('prod-approval') === 'waiting',
+  };
+  for (const [id, waiting] of Object.entries(approvalWait)) {
+    const node = document.getElementById(id);
+    if (node) node.classList.toggle('waiting', waiting);
+  }
 }
 
 /** @param {Set<string>} flows */
@@ -448,6 +543,88 @@ function syncFlowDots(flows) {
       flowDots.delete(flowId);
     }
   });
+}
+
+// --------------------------------------------------------------------------
+// GHCR — IMAGE-STAPEL
+// --------------------------------------------------------------------------
+const GHCR_SLOTS = 3;
+const ENV_CHIP = { int: 'INT', abnahme: 'ABN', prod: 'PROD' };
+/** Zuletzt gerenderte Stapel-Spitze — Wechsel löst die Slide-Animation aus. */
+let lastRegistryTop = null;
+
+/**
+ * Rendert den Image-Stapel (max. 3 Karten, oben = neueste).
+ * Ändert sich images[0].version, rutscht eine neue Karte von oben ein,
+ * die übrigen rücken nach (CSS-Keyframes). Je Karte: Versions-Badge +
+ * Env-Chips für jede Umgebung, deren Version der Karten-Version entspricht.
+ */
+function renderRegistry(state) {
+  const images = Array.isArray(state.registry?.images) ? state.registry.images.slice(0, GHCR_SLOTS) : [];
+  const environments = state.environments || {};
+  const topVersion = images[0]?.version ?? null;
+  const isNewTop = lastRegistryTop !== null && topVersion !== null && topVersion !== lastRegistryTop;
+
+  for (let i = 0; i < GHCR_SLOTS; i++) {
+    const card = document.getElementById(`ghcr-card-${i}`);
+    if (!card) continue;
+    fillGhcrCard(card, images[i], environments);
+  }
+
+  // Stapel-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
+  if (isNewTop && !prefersReducedMotion.matches) {
+    for (let i = 0; i < GHCR_SLOTS; i++) {
+      const card = document.getElementById(`ghcr-card-${i}`);
+      if (!card || card.classList.contains('empty')) continue;
+      const cls = i === 0 ? 'card-enter' : 'card-shift';
+      card.classList.remove('card-enter', 'card-shift');
+      void card.getBoundingClientRect(); // Reflow erzwingen → Keyframe neu starten
+      card.classList.add(cls);
+    }
+  }
+  lastRegistryTop = topVersion;
+}
+
+/** Füllt eine einzelne Stapel-Karte (oder markiert sie als leer/gestrichelt). */
+function fillGhcrCard(card, img, environments) {
+  const badgeBg = card.querySelector('.ghcr-badge-bg');
+  const badgeTxt = card.querySelector('.ghcr-badge-txt');
+  const chips = card.querySelector('.ghcr-chips');
+
+  if (!img || !img.version) {
+    card.classList.add('empty');
+    if (badgeTxt.textContent !== '–') badgeTxt.textContent = '–';
+    badgeBg.style.fill = '';
+    badgeTxt.style.fill = '';
+    if (chips.dataset.envs !== '') {
+      chips.dataset.envs = '';
+      chips.textContent = '';
+    }
+    return;
+  }
+
+  card.classList.remove('empty');
+  const color = versionColor(img.version) || VERSION_PALETTE[0];
+  badgeBg.style.fill = color;
+  badgeTxt.style.fill = contrastText(color);
+  const label = `v${img.version}`;
+  if (badgeTxt.textContent !== label) badgeTxt.textContent = label;
+
+  // Env-Chips: jede Umgebung, deren Version dieser Karte entspricht → Drift sichtbar
+  const matching = ENVS.filter((e) => environments[e]?.version === img.version);
+  const want = matching.join(',');
+  if (chips.dataset.envs !== want) {
+    chips.dataset.envs = want;
+    chips.textContent = '';
+    matching.forEach((env, idx) => {
+      const g = svg('g', { class: `ghcr-chip chip-${env}`, transform: `translate(${14 + idx * 52},58)` });
+      g.appendChild(svg('rect', { x: '0', y: '0', width: '48', height: '24', rx: '12', class: 'ghcr-chip-bg' }));
+      const t = svg('text', { x: '24', y: '17', 'text-anchor': 'middle', class: 'ghcr-chip-txt' });
+      t.textContent = ENV_CHIP[env];
+      g.appendChild(t);
+      chips.appendChild(g);
+    });
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -654,6 +831,7 @@ function applyState(state) {
   renderStages(state.github);
   renderTests(state.tests || {});
   renderMap(state);
+  renderRegistry(state);
   renderTicker(state.ticker);
   renderControls(state.github);
 }

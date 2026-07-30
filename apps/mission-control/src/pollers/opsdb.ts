@@ -1,11 +1,12 @@
 import pg from 'pg';
 import type { Config } from '../config.js';
 import type { StateStore } from '../state.js';
-import type { TickerItem } from '../types.js';
+import type { RegistryImage, TickerItem } from '../types.js';
 
-// Ops-DB-Poller (alle 5 s). Liest die letzten 10 Deployments + Testläufe und
-// formt daraus den deutschen Ticker (neueste zuerst, max. 10). DB nicht erreichbar
-// ⇒ Ticker friert auf dem letzten Stand ein, kein Crash (fail-safe).
+// Ops-DB-Poller (alle 5 s). Liest die letzten 10 Deployments + Testläufe (Ticker)
+// sowie die letzten 3 gebauten Versionen (GHCR-Stapel). Ticker: neueste zuerst,
+// max. 10, deutsch. DB nicht erreichbar ⇒ letzter Stand friert ein, kein Crash
+// (fail-safe).
 
 const { Pool } = pg;
 
@@ -36,6 +37,11 @@ type TestRunRow = {
   failed: number;
   flaky: number;
   source: string;
+};
+
+type RegistryRow = {
+  version: string;
+  image_tag: string;
 };
 
 interface TickerEntry {
@@ -85,15 +91,28 @@ export class OpsDbPoller {
     if (this.running) return;
     this.running = true;
     try {
-      const [deployments, testRuns] = await Promise.all([
+      const [deployments, testRuns, registry] = await Promise.all([
         this.pool.query<DeploymentRow>(
           'SELECT time, env, image_tag, status, version FROM deployments ORDER BY time DESC LIMIT 10',
         ),
         this.pool.query<TestRunRow>(
           'SELECT time, env, total, passed, failed, flaky, source FROM test_runs ORDER BY time DESC LIMIT 10',
         ),
+        // Letzte 3 distinct Versionen (version <> ''), sortiert nach dem jeweils
+        // jüngsten Deployment; image_tag stammt aus dem neuesten Eintrag der Version.
+        this.pool.query<RegistryRow>(
+          `SELECT version, image_tag FROM (
+             SELECT DISTINCT ON (version) version, image_tag, time
+             FROM deployments
+             WHERE version <> ''
+             ORDER BY version, time DESC
+           ) latest
+           ORDER BY time DESC
+           LIMIT 3`,
+        ),
       ]);
       this.state.setTicker(buildTicker(deployments.rows, testRuns.rows));
+      this.state.setRegistry(buildRegistry(registry.rows));
     } catch (error) {
       // DB weg: letzten Ticker behalten (einfrieren), nicht überschreiben.
       console.warn('Ops-DB-Poll fehlgeschlagen (Ticker eingefroren):', (error as Error).message);
@@ -145,6 +164,14 @@ function testRunText(row: TestRunRow): string {
   if (row.flaky > 0) text += `, ${row.flaky} flaky`;
   if (row.failed > 0) text += `, ${row.failed} fehlgeschlagen`;
   return text;
+}
+
+/** Formt die Registry-Zeilen in den GHCR-Stapel (neueste Version zuerst). */
+export function buildRegistry(rows: RegistryRow[]): RegistryImage[] {
+  return rows.map((row) => ({
+    version: row.version,
+    imageTag: row.image_tag ?? '',
+  }));
 }
 
 export function buildTicker(

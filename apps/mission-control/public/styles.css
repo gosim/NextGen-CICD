@@ -569,6 +569,52 @@ body {
   overflow: auto;
 }
 
+/* Kompaktzeile (abnahme / smoke / quarantine) — eine Zeile statt Einzeltests */
+.test-compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 2px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.test-compact .tcx-shield {
+  font-size: 17px;
+  line-height: 1;
+}
+.test-compact .tcx-label {
+  color: var(--text);
+}
+.test-compact .tcx-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.test-compact .tcx-spin {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #9fc0ff;
+  animation: spin 0.8s linear infinite;
+}
+.test-compact .tcx-res {
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+.test-compact .tcx-res.ok {
+  color: var(--success);
+}
+.test-compact .tcx-res.fail {
+  color: var(--failure);
+}
+.test-compact .tcx-flaky {
+  color: var(--flaky);
+  font-weight: 800;
+  font-size: 13px;
+}
+
 /* ====================== ARCHITEKTUR-KARTE ====================== */
 .map-section {
   flex: 1;
@@ -607,11 +653,6 @@ body {
   font-size: 17px;
   font-weight: 700;
 }
-.node-sub {
-  fill: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-}
 .node-ic {
   font-size: 30px;
 }
@@ -649,9 +690,9 @@ body {
 }
 .env-name {
   fill: var(--text);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 .env-version rect {
   fill: var(--idle);
@@ -756,6 +797,119 @@ body {
 .flow-dots-restore .flow-dot {
   fill: #ff8a97;
   filter: drop-shadow(0 0 5px rgba(239, 71, 87, 0.9));
+}
+
+/* ==================== GHCR — Image-Stapel ==================== */
+.ghcr-frame {
+  fill: rgba(16, 24, 42, 0.55);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+.ghcr-frame-label {
+  fill: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+/* Aktiver Stapel: nur Rahmen glüht, kein Skalieren des gesamten Blocks */
+.ghcr-stack.comp.active {
+  animation: none;
+}
+.ghcr-stack.comp.active .ghcr-frame {
+  stroke: #6ea0ff;
+  stroke-width: 2.5;
+}
+
+.ghcr-card {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ghcr-card-bg {
+  fill: var(--panel);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+.ghcr-card.empty .ghcr-card-bg {
+  fill: transparent;
+  stroke: var(--border-soft);
+  stroke-dasharray: 6 5;
+  opacity: 0.5;
+}
+.ghcr-card.empty .ghcr-badge-bg,
+.ghcr-card.empty .ghcr-badge-txt,
+.ghcr-card.empty .ghcr-chips {
+  display: none;
+}
+.ghcr-badge-bg {
+  fill: var(--idle);
+}
+.ghcr-badge-txt {
+  fill: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+.ghcr-chip-bg {
+  fill: rgba(138, 184, 255, 0.14);
+  stroke: rgba(138, 184, 255, 0.5);
+  stroke-width: 1;
+}
+.ghcr-chip-txt {
+  fill: #cfe0ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+/* Stapel-Spitze glüht während eines Rollback-Pulls (§3) */
+.ghcr-card.glow .ghcr-card-bg {
+  stroke: #ff8a97;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 8px rgba(239, 71, 87, 0.8));
+}
+/* Neue Spitze rutscht von oben ein, übrige rücken nach */
+.ghcr-card.card-enter {
+  animation: ghcr-card-enter 0.5s ease both;
+}
+.ghcr-card.card-shift {
+  animation: ghcr-card-shift 0.5s ease both;
+}
+
+/* ==================== Promotionskette (Kettenpfeile + Freigaben) ==================== */
+.chain-arrow {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+.chain-head-path {
+  fill: var(--border);
+}
+.flow-path.flow-promote {
+  stroke-width: 3;
+}
+.approval-node {
+  cursor: default;
+}
+.approval-ring {
+  fill: var(--panel);
+  stroke: var(--waiting);
+  stroke-width: 2.5;
+  opacity: 0.85;
+}
+.approval-ic {
+  fill: var(--muted);
+  font-size: 18px;
+  font-weight: 800;
+}
+.approval-node.waiting .approval-ring {
+  fill: rgba(138, 184, 255, 0.16);
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(138, 184, 255, 0.7));
+  animation: approval-pulse var(--pulse-dur) ease-in-out infinite;
+}
+.approval-node.waiting .approval-ic {
+  fill: #dbe9ff;
 }
 
 /* Legende */
@@ -1071,6 +1225,35 @@ body {
     transform: scale(1) translateY(0);
   }
 }
+/* GHCR-Stapel: neue Karte rutscht von oben ein / übrige rücken nach */
+@keyframes ghcr-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-104px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ghcr-card-shift {
+  from {
+    transform: translateY(-104px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+/* ⏸-Puls auf den Kettenpfeilen */
+@keyframes approval-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
 
 /* ==================== REDUZIERTE BEWEGUNG ==================== */
 @media (prefers-reduced-motion: reduce) {
@@ -1086,7 +1269,8 @@ body {
     display: none !important;
   }
   .stage-spin,
-  .tc-spin {
+  .tc-spin,
+  .tcx-spin {
     border-top-color: transparent;
   }
 }

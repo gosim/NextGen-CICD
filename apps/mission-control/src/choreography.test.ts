@@ -47,14 +47,12 @@ describe('deriveChoreography', () => {
         ]),
       ]),
     );
-    expect(result.active).toEqual(
-      expect.arrayContaining(['int-db', 'backup-store']),
-    );
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-store']));
     expect(result.flows).toContain('int-backup');
     expect(result.alarm).toBeNull();
   });
 
-  it('Rolling-Step: Proxy/FE/BE/Migrate aktiv, Pull- und Migrate-Flow', () => {
+  it('Abnahme-Deploy: Frontend/Backend + ghcr aktiv, Pull-Flow + Promotion int→abnahme', () => {
     const result = deriveChoreography(
       input([
         job('Abnahme / 🚀 Deploy', 'in_progress', [
@@ -63,28 +61,59 @@ describe('deriveChoreography', () => {
       ]),
     );
     expect(result.active).toEqual(
-      expect.arrayContaining([
-        'abnahme-proxy',
-        'abnahme-fe-1',
-        'abnahme-fe-2',
-        'abnahme-be-1',
-        'abnahme-be-2',
-        'abnahme-migrate',
-      ]),
+      expect.arrayContaining(['abnahme-frontend', 'abnahme-backend', 'ghcr']),
     );
-    expect(result.flows).toEqual(expect.arrayContaining(['abnahme-pull', 'abnahme-migrate']));
+    expect(result.flows).toEqual(expect.arrayContaining(['abnahme-pull', 'promote-int-abnahme']));
+    // Der abgeschaffte Kettenpfeil der PROD-Stufe darf hier nicht anspringen.
+    expect(result.flows).not.toContain('promote-abnahme-prod');
   });
 
-  it('Gate läuft: Playwright + Backend-Kette aktiv, Test-Flow', () => {
+  it('PROD-Deploy: Pull-Flow + Promotion abnahme→prod', () => {
+    const result = deriveChoreography(
+      input([
+        job('PROD / 🚀 Deploy', 'in_progress', [step('Stack deployen → prod')]),
+      ]),
+    );
+    expect(result.active).toEqual(
+      expect.arrayContaining(['prod-frontend', 'prod-backend', 'ghcr']),
+    );
+    expect(result.flows).toEqual(expect.arrayContaining(['prod-pull', 'promote-abnahme-prod']));
+  });
+
+  it('INT-Deploy: Einstiegsstufe hat keinen eingehenden Promote-Flow', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🚀 Deploy', 'in_progress', [step('Rolling-Deployment: sha-abc1234 → int')]),
+      ]),
+    );
+    expect(result.active).toEqual(expect.arrayContaining(['int-frontend', 'int-backend', 'ghcr']));
+    expect(result.flows).toContain('int-pull');
+    expect(result.flows).not.toContain('promote-int-abnahme');
+    expect(result.flows).not.toContain('promote-abnahme-prod');
+  });
+
+  it('Gate läuft: Playwright + Frontend/Backend/DB aktiv, Test-Flow', () => {
     const result = deriveChoreography(input([job('INT / 🛡 Quality Gate', 'in_progress')]));
     expect(result.active).toEqual(
-      expect.arrayContaining(['playwright', 'int-proxy', 'int-be-1', 'int-be-2', 'int-db']),
+      expect.arrayContaining(['playwright', 'int-frontend', 'int-backend', 'int-db']),
     );
     expect(result.flows).toContain('int-test');
     expect(result.alarm).toBeNull();
   });
 
-  it('Rollback läuft: Restore-Flüsse + roter Alarm', () => {
+  it('Promote-Step im Gate-Job: ghcr aktiv, registry-push landet oben auf dem Stapel', () => {
+    const result = deriveChoreography(
+      input([
+        job('INT / 🛡 Quality Gate', 'in_progress', [
+          step('Promote: Image auf die Stapel-Spitze'),
+        ]),
+      ]),
+    );
+    expect(result.active).toContain('ghcr');
+    expect(result.flows).toContain('registry-push');
+  });
+
+  it('Rollback läuft: ghcr statt runner, Restore + Rollback-Pull vom Stapel + roter Alarm', () => {
     const result = deriveChoreography(
       input([
         job('INT / ⛑ Rollback', 'in_progress', [
@@ -92,9 +121,8 @@ describe('deriveChoreography', () => {
         ]),
       ]),
     );
-    expect(result.active).toEqual(
-      expect.arrayContaining(['int-db', 'backup-store', 'runner']),
-    );
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-store', 'ghcr']));
+    expect(result.active).not.toContain('runner');
     expect(result.flows).toEqual(
       expect.arrayContaining(['int-restore', 'int-rollback-pull']),
     );
@@ -126,7 +154,7 @@ describe('deriveChoreography', () => {
   it('Stability-Check läuft: 🔍-Job aktiviert den Testpfad der Umgebung', () => {
     const result = deriveChoreography(input([job('🔍 PROD', 'in_progress')]));
     expect(result.active).toEqual(
-      expect.arrayContaining(['playwright', 'prod-proxy', 'prod-be-1', 'prod-be-2', 'prod-db']),
+      expect.arrayContaining(['playwright', 'prod-frontend', 'prod-backend', 'prod-db']),
     );
     expect(result.flows).toContain('prod-test');
   });
@@ -134,7 +162,7 @@ describe('deriveChoreography', () => {
   it('Live-Test-Signal ohne passenden Job aktiviert den Testpfad dennoch', () => {
     const result = deriveChoreography(input([], { active: true, env: 'int' }));
     expect(result.active).toEqual(
-      expect.arrayContaining(['playwright', 'int-proxy', 'int-be-1', 'int-be-2', 'int-db']),
+      expect.arrayContaining(['playwright', 'int-frontend', 'int-backend', 'int-db']),
     );
     expect(result.flows).toContain('int-test');
   });

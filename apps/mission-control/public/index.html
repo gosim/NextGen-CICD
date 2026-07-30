@@ -81,6 +81,9 @@
           <h2 class="test-title" id="test-title">Quality Gate</h2>
           <span class="test-progress" id="test-progress">0/0</span>
         </div>
+        <!-- Kompaktzeile für Nicht-Regression-Suiten (abnahme/smoke/quarantine) -->
+        <div class="test-compact" id="test-compact" role="status" hidden></div>
+        <!-- Einzeltest-Liste (nur bei int-regression) -->
         <ul class="test-list" id="test-list"></ul>
       </section>
 
@@ -93,253 +96,238 @@
           role="img"
           aria-label="Live-Architektur der CI/CD-Pipeline"
         >
+          <defs>
+            <!-- Pfeilspitze für die Kettenpfeile der Promotionskette -->
+            <marker
+              id="chain-head"
+              viewBox="0 0 10 10"
+              refX="7.5"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
+              <path class="chain-head-path" d="M0 0 L10 5 L0 10 Z" />
+            </marker>
+          </defs>
+
           <!-- Spaltenbeschriftungen -->
-          <text class="col-label" x="155" y="34" text-anchor="middle">GitHub</text>
-          <text class="col-label" x="425" y="34" text-anchor="middle">Ausführung (Mac)</text>
-          <text class="col-label" x="1080" y="26" text-anchor="middle">Umgebungen</text>
+          <text class="col-label" x="157" y="30" text-anchor="middle">GitHub</text>
+          <text class="col-label" x="405" y="30" text-anchor="middle">Ausführung (Mac)</text>
+          <text class="col-label" x="1080" y="30" text-anchor="middle">Umgebungen — Promotionskette</text>
+
+          <!-- Kettenpfeile der Promotionskette (unterste Ebene, unter den Flüssen) -->
+          <g class="chain-arrows" aria-hidden="true">
+            <path class="chain-arrow" d="M870 420 L931 420" marker-end="url(#chain-head)" />
+            <path class="chain-arrow" d="M1223 420 L1284 420" marker-end="url(#chain-head)" />
+          </g>
 
           <!-- ===================== FLÜSSE (unterste Ebene) ===================== -->
           <g id="flows-layer" fill="none">
-            <path id="flow-ci-build" class="flow-path" d="M155 180 L155 230" />
+            <path id="flow-ci-build" class="flow-path" d="M150 162 L150 248" />
+            <path id="flow-registry-push" class="flow-path" d="M585 220 C440 170 330 200 256 276" />
 
             <!-- INT -->
-            <path id="flow-int-pull" class="flow-path" d="M250 280 C430 280 470 160 620 160" />
-            <path id="flow-int-migrate" class="flow-path" d="M1400 175 L1360 175" />
-            <path id="flow-int-backup" class="flow-path" d="M1300 230 C1000 340 720 320 520 285" />
-            <path id="flow-int-test" class="flow-path" d="M520 440 L710 180 L905 228 L1300 175" />
-            <path id="flow-int-restore" class="flow-path flow-restore" d="M520 285 C760 300 1020 300 1300 230" />
-            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M520 130 L620 130" />
+            <path id="flow-int-pull" class="flow-path" d="M256 385 C420 340 480 300 585 300" />
+            <path id="flow-int-test" class="flow-path" d="M480 370 C540 330 560 300 585 280" />
+            <path id="flow-int-backup" class="flow-path" d="M715 580 C620 640 560 620 495 605" />
+            <path id="flow-int-restore" class="flow-path flow-restore" d="M495 595 C560 620 620 560 700 545" />
+            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M256 278 C420 210 470 230 585 250" />
 
             <!-- ABNAHME -->
-            <path id="flow-abnahme-pull" class="flow-path" d="M250 280 C430 320 450 440 620 440" />
-            <path id="flow-abnahme-migrate" class="flow-path" d="M1400 455 L1360 455" />
-            <path id="flow-abnahme-backup" class="flow-path" d="M1300 510 C1000 560 720 400 520 285" />
-            <path id="flow-abnahme-test" class="flow-path" d="M520 440 L710 460 L905 508 L1300 455" />
-            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M520 285 C760 400 1020 500 1300 510" />
-            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M520 130 C560 300 580 410 620 410" />
+            <path id="flow-abnahme-pull" class="flow-path" d="M256 395 C520 470 720 320 938 300" />
+            <path id="flow-abnahme-test" class="flow-path" d="M485 400 C650 430 800 420 938 400" />
+            <path id="flow-abnahme-backup" class="flow-path" d="M1060 520 C820 640 640 640 495 610" />
+            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M495 600 C640 650 850 560 1060 540" />
+            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M256 283 C520 360 720 250 938 260" />
 
             <!-- PROD -->
-            <path id="flow-prod-pull" class="flow-path" d="M250 280 C430 420 450 720 620 720" />
-            <path id="flow-prod-migrate" class="flow-path" d="M1400 735 L1360 735" />
-            <path id="flow-prod-backup" class="flow-path" d="M1300 790 C1000 700 720 500 520 285" />
-            <path id="flow-prod-test" class="flow-path" d="M520 440 L710 740 L905 788 L1300 735" />
-            <path id="flow-prod-restore" class="flow-path flow-restore" d="M520 285 C760 520 1020 720 1300 790" />
-            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M520 130 C560 420 580 690 620 690" />
+            <path id="flow-prod-pull" class="flow-path" d="M256 405 C560 540 900 360 1291 300" />
+            <path id="flow-prod-test" class="flow-path" d="M490 410 C720 500 1000 470 1291 430" />
+            <path id="flow-prod-backup" class="flow-path" d="M1413 520 C1050 680 680 660 495 615" />
+            <path id="flow-prod-restore" class="flow-path flow-restore" d="M495 605 C680 670 1050 580 1413 545" />
+            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M256 288 C560 440 900 320 1291 270" />
+
+            <!-- Promotionskette (entlang der Kettenpfeile) -->
+            <path id="flow-promote-int-abnahme" class="flow-path flow-promote" d="M870 420 L938 420" />
+            <path id="flow-promote-abnahme-prod" class="flow-path flow-promote" d="M1223 420 L1291 420" />
           </g>
 
-          <!-- ===================== GITHUB-SPALTE ===================== -->
+          <!-- ===================== GITHUB-SPALTE (links) ===================== -->
           <g class="node comp" data-component="github-ci" role="img" aria-label="GitHub CI">
             <title>GitHub Actions — CI (Build &amp; Test, GHCR-Push)</title>
-            <rect class="node-box" x="60" y="80" width="190" height="100" rx="12" />
-            <text class="node-ic" x="155" y="128" text-anchor="middle">⚙️</text>
-            <text class="node-label" x="155" y="158" text-anchor="middle">CI</text>
-          </g>
-          <g class="node comp" data-component="ghcr" role="img" aria-label="GHCR Registry">
-            <title>GitHub Container Registry — Image-Ablage (sha-Tags)</title>
-            <rect class="node-box" x="60" y="230" width="190" height="100" rx="12" />
-            <text class="node-ic" x="155" y="278" text-anchor="middle">📦</text>
-            <text class="node-label" x="155" y="308" text-anchor="middle">GHCR</text>
+            <rect class="node-box" x="45" y="70" width="210" height="92" rx="12" />
+            <text class="node-ic" x="150" y="116" text-anchor="middle">⚙️</text>
+            <text class="node-label" x="150" y="146" text-anchor="middle">CI</text>
           </g>
 
-          <!-- ===================== RUNNER-SPALTE ===================== -->
+          <!-- GHCR — Image-Stapel: die letzten 3 Versionen als Karten (oben = neueste) -->
+          <g
+            class="node comp ghcr-stack"
+            data-component="ghcr"
+            role="img"
+            aria-label="GHCR Image-Registry — Stapel der letzten Versionen"
+          >
+            <title>GitHub Container Registry — Stapel der zuletzt gebauten Images (oben = neueste)</title>
+            <rect class="ghcr-frame" x="45" y="205" width="225" height="380" rx="14" />
+            <text class="ghcr-frame-label" x="157" y="230" text-anchor="middle">GHCR — Image-Registry</text>
+
+            <!-- Slot 0 = neueste Version (Stapel-Spitze) -->
+            <g class="ghcr-slot" transform="translate(62,248)">
+              <g class="ghcr-card empty" id="ghcr-card-0">
+                <rect class="ghcr-card-bg" x="0" y="0" width="192" height="96" rx="10" />
+                <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
+                <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
+                <g class="ghcr-chips"></g>
+              </g>
+            </g>
+            <g class="ghcr-slot" transform="translate(62,352)">
+              <g class="ghcr-card empty" id="ghcr-card-1">
+                <rect class="ghcr-card-bg" x="0" y="0" width="192" height="96" rx="10" />
+                <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
+                <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
+                <g class="ghcr-chips"></g>
+              </g>
+            </g>
+            <g class="ghcr-slot" transform="translate(62,456)">
+              <g class="ghcr-card empty" id="ghcr-card-2">
+                <rect class="ghcr-card-bg" x="0" y="0" width="192" height="96" rx="10" />
+                <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
+                <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
+                <g class="ghcr-chips"></g>
+              </g>
+            </g>
+          </g>
+
+          <!-- ===================== AUSFÜHRUNG (schmale Mitte) ===================== -->
           <g class="node comp" data-component="runner" role="img" aria-label="Self-hosted Runner">
             <title>Self-hosted Runner (Mac) — führt Deploy, Gate &amp; Rollback aus</title>
-            <rect class="node-box" x="330" y="80" width="190" height="100" rx="12" />
-            <text class="node-ic" x="425" y="126" text-anchor="middle">🖥️</text>
-            <text class="node-label" x="425" y="156" text-anchor="middle">Runner (Mac)</text>
-          </g>
-          <g class="node comp" data-component="backup-store" role="img" aria-label="Backup-Speicher">
-            <title>Backup-Speicher — pg_dump-Sicherungen für den Rollback</title>
-            <path class="cyl-body" d="M335 235 L335 340 A90 13 0 0 0 515 340 L515 235" />
-            <ellipse class="cyl-line" cx="425" cy="272" rx="90" ry="13" />
-            <ellipse class="cyl-line" cx="425" cy="309" rx="90" ry="13" />
-            <ellipse class="cyl-top" cx="425" cy="235" rx="90" ry="13" />
-            <text class="node-label" x="425" y="332" text-anchor="middle">Backups</text>
+            <rect class="node-box" x="300" y="95" width="210" height="90" rx="12" />
+            <text class="node-ic" x="405" y="140" text-anchor="middle">🖥️</text>
+            <text class="node-label" x="405" y="170" text-anchor="middle">Runner (Mac)</text>
           </g>
           <g class="node comp" data-component="playwright" role="img" aria-label="Playwright">
             <title>Playwright — E2E-Tests als Quality Gate</title>
-            <rect class="node-box" x="330" y="390" width="190" height="100" rx="12" />
-            <text class="node-ic" x="425" y="436" text-anchor="middle">🎭</text>
-            <text class="node-label" x="425" y="466" text-anchor="middle">Playwright</text>
+            <rect class="node-box" x="300" y="340" width="210" height="100" rx="12" />
+            <text class="node-ic" x="405" y="388" text-anchor="middle">🎭</text>
+            <text class="node-label" x="405" y="418" text-anchor="middle">Playwright</text>
+          </g>
+          <g class="node comp" data-component="backup-store" role="img" aria-label="Backup-Speicher">
+            <title>Backup-Speicher — pg_dump-Sicherungen für den Rollback</title>
+            <path class="cyl-body" d="M315 560 L315 655 A90 13 0 0 0 495 655 L495 560" />
+            <ellipse class="cyl-line" cx="405" cy="595" rx="90" ry="13" />
+            <ellipse class="cyl-line" cx="405" cy="628" rx="90" ry="13" />
+            <ellipse class="cyl-top" cx="405" cy="560" rx="90" ry="13" />
+            <text class="node-label" x="405" y="650" text-anchor="middle">Backups</text>
           </g>
 
           <!-- ===================== UMGEBUNG: INT ===================== -->
-          <g class="env-box" data-env="int" transform="translate(620,40)" tabindex="0" role="button" aria-label="Umgebung INT — Details anzeigen">
-            <rect class="env-alarm-frame" x="-6" y="-6" width="932" height="262" rx="18" />
-            <rect class="env-bg" x="0" y="0" width="920" height="250" rx="14" />
-            <line class="env-divider" x1="0" y1="42" x2="920" y2="42" />
-            <text class="env-name" x="20" y="28">INT</text>
+          <g class="env-box" data-env="int" transform="translate(585,190)" tabindex="0" role="button" aria-label="Umgebung INT — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="297" height="472" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="285" height="460" rx="14" />
+            <line class="env-divider" x1="0" y1="50" x2="285" y2="50" />
+            <text class="env-name" x="18" y="33">INT</text>
             <g class="env-version">
-              <rect x="700" y="8" width="120" height="26" rx="13" />
-              <text x="760" y="26" text-anchor="middle">–</text>
+              <rect x="120" y="14" width="100" height="28" rx="14" />
+              <text x="170" y="33" text-anchor="middle">–</text>
             </g>
-            <circle class="env-health health-dot" cx="890" cy="21" r="9" />
+            <circle class="env-health health-dot" cx="258" cy="28" r="9" />
 
-            <g class="node comp" data-component="int-proxy">
-              <title>Proxy (nginx) — /api-Weiterleitung</title>
-              <rect class="node-box" x="30" y="95" width="120" height="90" rx="10" />
-              <text class="node-ic sm" x="90" y="135" text-anchor="middle">🔀</text>
-              <text class="node-sub" x="90" y="162" text-anchor="middle">Proxy</text>
+            <g class="node comp" data-component="int-frontend">
+              <title>Frontend (nginx) — ausgelieferte Web-App</title>
+              <rect class="node-box" x="22" y="68" width="241" height="86" rx="10" />
+              <text class="node-ic sm" x="60" y="120" text-anchor="middle">🖥️</text>
+              <text class="node-label" x="160" y="118" text-anchor="middle">Frontend</text>
             </g>
-            <g class="node comp inst" data-component="int-fe-1">
-              <title>Frontend-Instanz fe-1</title>
-              <rect class="node-box" x="200" y="60" width="170" height="76" rx="10" />
-              <text class="node-label" x="285" y="98" text-anchor="middle">fe-1</text>
-              <text class="node-sub" x="285" y="120" text-anchor="middle">Frontend</text>
-              <circle class="inst-dot health-dot" cx="356" cy="76" r="6" />
-            </g>
-            <g class="node comp inst" data-component="int-fe-2">
-              <title>Frontend-Instanz fe-2</title>
-              <rect class="node-box" x="400" y="60" width="170" height="76" rx="10" />
-              <text class="node-label" x="485" y="98" text-anchor="middle">fe-2</text>
-              <text class="node-sub" x="485" y="120" text-anchor="middle">Frontend</text>
-              <circle class="inst-dot health-dot" cx="556" cy="76" r="6" />
-            </g>
-            <g class="node comp inst" data-component="int-be-1">
-              <title>Backend-Instanz be-1</title>
-              <rect class="node-box" x="200" y="150" width="170" height="76" rx="10" />
-              <text class="node-label" x="285" y="188" text-anchor="middle">be-1</text>
-              <text class="node-sub" x="285" y="210" text-anchor="middle">Backend</text>
-              <circle class="inst-dot health-dot" cx="356" cy="166" r="6" />
-            </g>
-            <g class="node comp inst" data-component="int-be-2">
-              <title>Backend-Instanz be-2</title>
-              <rect class="node-box" x="400" y="150" width="170" height="76" rx="10" />
-              <text class="node-label" x="485" y="188" text-anchor="middle">be-2</text>
-              <text class="node-sub" x="485" y="210" text-anchor="middle">Backend</text>
-              <circle class="inst-dot health-dot" cx="556" cy="166" r="6" />
+            <g class="node comp" data-component="int-backend">
+              <title>Backend (Node/Express) — API</title>
+              <rect class="node-box" x="22" y="166" width="241" height="86" rx="10" />
+              <text class="node-ic sm" x="60" y="218" text-anchor="middle">⚙️</text>
+              <text class="node-label" x="160" y="216" text-anchor="middle">Backend</text>
             </g>
             <g class="node comp" data-component="int-db">
               <title>PostgreSQL-Datenbank</title>
-              <path class="cyl-body" d="M620 80 L620 190 A60 14 0 0 0 740 190 L740 80" />
-              <ellipse class="cyl-top" cx="680" cy="80" rx="60" ry="14" />
-              <text class="node-label" x="680" y="150" text-anchor="middle">DB</text>
-            </g>
-            <g class="node comp" data-component="int-migrate">
-              <title>Migrationen (drizzle) — One-Shot vor Backend-Start</title>
-              <rect class="node-box" x="780" y="105" width="110" height="60" rx="10" />
-              <text class="node-ic sm" x="835" y="132" text-anchor="middle">⚡</text>
-              <text class="node-sub" x="835" y="154" text-anchor="middle">Migrate</text>
+              <path class="cyl-body" d="M64 290 L64 410 A78 13 0 0 0 220 410 L220 290" />
+              <ellipse class="cyl-top" cx="142" cy="290" rx="78" ry="13" />
+              <text class="node-label" x="142" y="360" text-anchor="middle">DB</text>
             </g>
           </g>
 
           <!-- ===================== UMGEBUNG: ABNAHME ===================== -->
-          <g class="env-box" data-env="abnahme" transform="translate(620,320)" tabindex="0" role="button" aria-label="Umgebung Abnahme — Details anzeigen">
-            <rect class="env-alarm-frame" x="-6" y="-6" width="932" height="262" rx="18" />
-            <rect class="env-bg" x="0" y="0" width="920" height="250" rx="14" />
-            <line class="env-divider" x1="0" y1="42" x2="920" y2="42" />
-            <text class="env-name" x="20" y="28">ABNAHME</text>
+          <g class="env-box" data-env="abnahme" transform="translate(938,190)" tabindex="0" role="button" aria-label="Umgebung Abnahme — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="297" height="472" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="285" height="460" rx="14" />
+            <line class="env-divider" x1="0" y1="50" x2="285" y2="50" />
+            <text class="env-name" x="18" y="33">ABNAHME</text>
             <g class="env-version">
-              <rect x="700" y="8" width="120" height="26" rx="13" />
-              <text x="760" y="26" text-anchor="middle">–</text>
+              <rect x="120" y="14" width="100" height="28" rx="14" />
+              <text x="170" y="33" text-anchor="middle">–</text>
             </g>
-            <circle class="env-health health-dot" cx="890" cy="21" r="9" />
+            <circle class="env-health health-dot" cx="258" cy="28" r="9" />
 
-            <g class="node comp" data-component="abnahme-proxy">
-              <title>Proxy (nginx) — /api-Weiterleitung</title>
-              <rect class="node-box" x="30" y="95" width="120" height="90" rx="10" />
-              <text class="node-ic sm" x="90" y="135" text-anchor="middle">🔀</text>
-              <text class="node-sub" x="90" y="162" text-anchor="middle">Proxy</text>
+            <g class="node comp" data-component="abnahme-frontend">
+              <title>Frontend (nginx) — ausgelieferte Web-App</title>
+              <rect class="node-box" x="22" y="68" width="241" height="86" rx="10" />
+              <text class="node-ic sm" x="60" y="120" text-anchor="middle">🖥️</text>
+              <text class="node-label" x="160" y="118" text-anchor="middle">Frontend</text>
             </g>
-            <g class="node comp inst" data-component="abnahme-fe-1">
-              <title>Frontend-Instanz fe-1</title>
-              <rect class="node-box" x="200" y="60" width="170" height="76" rx="10" />
-              <text class="node-label" x="285" y="98" text-anchor="middle">fe-1</text>
-              <text class="node-sub" x="285" y="120" text-anchor="middle">Frontend</text>
-              <circle class="inst-dot health-dot" cx="356" cy="76" r="6" />
-            </g>
-            <g class="node comp inst" data-component="abnahme-fe-2">
-              <title>Frontend-Instanz fe-2</title>
-              <rect class="node-box" x="400" y="60" width="170" height="76" rx="10" />
-              <text class="node-label" x="485" y="98" text-anchor="middle">fe-2</text>
-              <text class="node-sub" x="485" y="120" text-anchor="middle">Frontend</text>
-              <circle class="inst-dot health-dot" cx="556" cy="76" r="6" />
-            </g>
-            <g class="node comp inst" data-component="abnahme-be-1">
-              <title>Backend-Instanz be-1</title>
-              <rect class="node-box" x="200" y="150" width="170" height="76" rx="10" />
-              <text class="node-label" x="285" y="188" text-anchor="middle">be-1</text>
-              <text class="node-sub" x="285" y="210" text-anchor="middle">Backend</text>
-              <circle class="inst-dot health-dot" cx="356" cy="166" r="6" />
-            </g>
-            <g class="node comp inst" data-component="abnahme-be-2">
-              <title>Backend-Instanz be-2</title>
-              <rect class="node-box" x="400" y="150" width="170" height="76" rx="10" />
-              <text class="node-label" x="485" y="188" text-anchor="middle">be-2</text>
-              <text class="node-sub" x="485" y="210" text-anchor="middle">Backend</text>
-              <circle class="inst-dot health-dot" cx="556" cy="166" r="6" />
+            <g class="node comp" data-component="abnahme-backend">
+              <title>Backend (Node/Express) — API</title>
+              <rect class="node-box" x="22" y="166" width="241" height="86" rx="10" />
+              <text class="node-ic sm" x="60" y="218" text-anchor="middle">⚙️</text>
+              <text class="node-label" x="160" y="216" text-anchor="middle">Backend</text>
             </g>
             <g class="node comp" data-component="abnahme-db">
               <title>PostgreSQL-Datenbank</title>
-              <path class="cyl-body" d="M620 80 L620 190 A60 14 0 0 0 740 190 L740 80" />
-              <ellipse class="cyl-top" cx="680" cy="80" rx="60" ry="14" />
-              <text class="node-label" x="680" y="150" text-anchor="middle">DB</text>
-            </g>
-            <g class="node comp" data-component="abnahme-migrate">
-              <title>Migrationen (drizzle) — One-Shot vor Backend-Start</title>
-              <rect class="node-box" x="780" y="105" width="110" height="60" rx="10" />
-              <text class="node-ic sm" x="835" y="132" text-anchor="middle">⚡</text>
-              <text class="node-sub" x="835" y="154" text-anchor="middle">Migrate</text>
+              <path class="cyl-body" d="M64 290 L64 410 A78 13 0 0 0 220 410 L220 290" />
+              <ellipse class="cyl-top" cx="142" cy="290" rx="78" ry="13" />
+              <text class="node-label" x="142" y="360" text-anchor="middle">DB</text>
             </g>
           </g>
 
           <!-- ===================== UMGEBUNG: PROD ===================== -->
-          <g class="env-box" data-env="prod" transform="translate(620,600)" tabindex="0" role="button" aria-label="Umgebung PROD — Details anzeigen">
-            <rect class="env-alarm-frame" x="-6" y="-6" width="932" height="262" rx="18" />
-            <rect class="env-bg" x="0" y="0" width="920" height="250" rx="14" />
-            <line class="env-divider" x1="0" y1="42" x2="920" y2="42" />
-            <text class="env-name" x="20" y="28">PROD</text>
+          <g class="env-box" data-env="prod" transform="translate(1291,190)" tabindex="0" role="button" aria-label="Umgebung PROD — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="297" height="472" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="285" height="460" rx="14" />
+            <line class="env-divider" x1="0" y1="50" x2="285" y2="50" />
+            <text class="env-name" x="18" y="33">PROD</text>
             <g class="env-version">
-              <rect x="700" y="8" width="120" height="26" rx="13" />
-              <text x="760" y="26" text-anchor="middle">–</text>
+              <rect x="120" y="14" width="100" height="28" rx="14" />
+              <text x="170" y="33" text-anchor="middle">–</text>
             </g>
-            <circle class="env-health health-dot" cx="890" cy="21" r="9" />
+            <circle class="env-health health-dot" cx="258" cy="28" r="9" />
 
-            <g class="node comp" data-component="prod-proxy">
-              <title>Proxy (nginx) — /api-Weiterleitung</title>
-              <rect class="node-box" x="30" y="95" width="120" height="90" rx="10" />
-              <text class="node-ic sm" x="90" y="135" text-anchor="middle">🔀</text>
-              <text class="node-sub" x="90" y="162" text-anchor="middle">Proxy</text>
+            <g class="node comp" data-component="prod-frontend">
+              <title>Frontend (nginx) — ausgelieferte Web-App</title>
+              <rect class="node-box" x="22" y="68" width="241" height="86" rx="10" />
+              <text class="node-ic sm" x="60" y="120" text-anchor="middle">🖥️</text>
+              <text class="node-label" x="160" y="118" text-anchor="middle">Frontend</text>
             </g>
-            <g class="node comp inst" data-component="prod-fe-1">
-              <title>Frontend-Instanz fe-1</title>
-              <rect class="node-box" x="200" y="60" width="170" height="76" rx="10" />
-              <text class="node-label" x="285" y="98" text-anchor="middle">fe-1</text>
-              <text class="node-sub" x="285" y="120" text-anchor="middle">Frontend</text>
-              <circle class="inst-dot health-dot" cx="356" cy="76" r="6" />
-            </g>
-            <g class="node comp inst" data-component="prod-fe-2">
-              <title>Frontend-Instanz fe-2</title>
-              <rect class="node-box" x="400" y="60" width="170" height="76" rx="10" />
-              <text class="node-label" x="485" y="98" text-anchor="middle">fe-2</text>
-              <text class="node-sub" x="485" y="120" text-anchor="middle">Frontend</text>
-              <circle class="inst-dot health-dot" cx="556" cy="76" r="6" />
-            </g>
-            <g class="node comp inst" data-component="prod-be-1">
-              <title>Backend-Instanz be-1</title>
-              <rect class="node-box" x="200" y="150" width="170" height="76" rx="10" />
-              <text class="node-label" x="285" y="188" text-anchor="middle">be-1</text>
-              <text class="node-sub" x="285" y="210" text-anchor="middle">Backend</text>
-              <circle class="inst-dot health-dot" cx="356" cy="166" r="6" />
-            </g>
-            <g class="node comp inst" data-component="prod-be-2">
-              <title>Backend-Instanz be-2</title>
-              <rect class="node-box" x="400" y="150" width="170" height="76" rx="10" />
-              <text class="node-label" x="485" y="188" text-anchor="middle">be-2</text>
-              <text class="node-sub" x="485" y="210" text-anchor="middle">Backend</text>
-              <circle class="inst-dot health-dot" cx="556" cy="166" r="6" />
+            <g class="node comp" data-component="prod-backend">
+              <title>Backend (Node/Express) — API</title>
+              <rect class="node-box" x="22" y="166" width="241" height="86" rx="10" />
+              <text class="node-ic sm" x="60" y="218" text-anchor="middle">⚙️</text>
+              <text class="node-label" x="160" y="216" text-anchor="middle">Backend</text>
             </g>
             <g class="node comp" data-component="prod-db">
               <title>PostgreSQL-Datenbank</title>
-              <path class="cyl-body" d="M620 80 L620 190 A60 14 0 0 0 740 190 L740 80" />
-              <ellipse class="cyl-top" cx="680" cy="80" rx="60" ry="14" />
-              <text class="node-label" x="680" y="150" text-anchor="middle">DB</text>
+              <path class="cyl-body" d="M64 290 L64 410 A78 13 0 0 0 220 410 L220 290" />
+              <ellipse class="cyl-top" cx="142" cy="290" rx="78" ry="13" />
+              <text class="node-label" x="142" y="360" text-anchor="middle">DB</text>
             </g>
-            <g class="node comp" data-component="prod-migrate">
-              <title>Migrationen (drizzle) — One-Shot vor Backend-Start</title>
-              <rect class="node-box" x="780" y="105" width="110" height="60" rx="10" />
-              <text class="node-ic sm" x="835" y="132" text-anchor="middle">⚡</text>
-              <text class="node-sub" x="835" y="154" text-anchor="middle">Migrate</text>
+          </g>
+
+          <!-- Freigabe-Symbole auf den Kettenpfeilen (⏸, pulsieren bei waiting) -->
+          <g class="approval-layer">
+            <g class="approval-node" id="approval-int-abnahme">
+              <title>Freigabe INT → Abnahme</title>
+              <circle class="approval-ring" cx="904" cy="420" r="19" />
+              <text class="approval-ic" x="904" y="427" text-anchor="middle">⏸</text>
+            </g>
+            <g class="approval-node" id="approval-abnahme-prod">
+              <title>Freigabe Abnahme → PROD</title>
+              <circle class="approval-ring" cx="1257" cy="420" r="19" />
+              <text class="approval-ic" x="1257" y="427" text-anchor="middle">⏸</text>
             </g>
           </g>
 

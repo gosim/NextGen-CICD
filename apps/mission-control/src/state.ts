@@ -4,6 +4,7 @@ import type {
   EnvKey,
   EnvironmentState,
   GithubJobView,
+  RegistryImage,
   RunInfo,
   Snapshot,
   Stage,
@@ -45,6 +46,7 @@ function initialSnapshot(): Snapshot {
       pendingApprovals: [],
     },
     choreography: { active: [], flows: [], alarm: null },
+    registry: { images: [] },
     environments: {
       int: emptyEnvironment(),
       abnahme: emptyEnvironment(),
@@ -123,6 +125,12 @@ export class StateStore {
 
   setTicker(ticker: TickerItem[]): void {
     this.snapshot.ticker = ticker;
+    this.scheduleBroadcast();
+  }
+
+  /** GHCR-Stapel setzen (vom Ops-DB-Poller): letzte 3 gebaute Versionen, neueste zuerst. */
+  setRegistry(images: RegistryImage[]): void {
+    this.snapshot.registry = { images };
     this.scheduleBroadcast();
   }
 

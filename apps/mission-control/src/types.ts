@@ -50,11 +50,34 @@ export interface Alarm {
   reason: string;
 }
 
+// ── Architektur-Karte: Komponenten & Flüsse (CONTRACT §2/§3, v2) ─────────────
+
+/** Globale Komponenten der Architektur-Karte (CONTRACT §2). */
+export type GlobalComponentId = 'github-ci' | 'ghcr' | 'runner' | 'backup-store' | 'playwright';
+
+/** Komponenten je Umgebung — bewusst vereinfachte Zuschauer-Sicht (CONTRACT §2). */
+export type EnvComponentId = `${EnvKey}-frontend` | `${EnvKey}-backend` | `${EnvKey}-db`;
+
+/** Alle ComponentIds, die pulsieren können. */
+export type ComponentId = GlobalComponentId | EnvComponentId;
+
+/** Alle animierten Datenflüsse (CONTRACT §3). */
+export type FlowId =
+  | 'ci-build'
+  | `${EnvKey}-pull`
+  | `${EnvKey}-backup`
+  | `${EnvKey}-test`
+  | `${EnvKey}-restore`
+  | `${EnvKey}-rollback-pull`
+  | 'registry-push'
+  | 'promote-int-abnahme'
+  | 'promote-abnahme-prod';
+
 export interface ChoreographyState {
   /** ComponentIds, die pulsieren sollen. */
-  active: string[];
+  active: ComponentId[];
   /** FlowIds, deren Punkte-Animation läuft. */
-  flows: string[];
+  flows: FlowId[];
   alarm: Alarm | null;
 }
 
@@ -99,10 +122,22 @@ export interface TickerItem {
   text: string;
 }
 
+/** Ein gebautes Image im GHCR-Stapel (CONTRACT §1 „registry"). */
+export interface RegistryImage {
+  version: string;
+  imageTag: string;
+}
+
+/** Der GHCR-Stapel: die letzten drei gebauten Versionen, neueste zuerst. */
+export interface RegistryState {
+  images: RegistryImage[];
+}
+
 export interface Snapshot {
   generatedAt: string;
   github: GithubState;
   choreography: ChoreographyState;
+  registry: RegistryState;
   environments: Record<EnvKey, EnvironmentState>;
   tests: TestsState;
   ticker: TickerItem[];
