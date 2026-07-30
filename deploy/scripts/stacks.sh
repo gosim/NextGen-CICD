@@ -19,20 +19,28 @@ KEEP_DOCKER="${2:-}"
 
 api_port() { grep -E '^API_PORT=' "$ROOT/deploy/env/$1.env" | cut -d= -f2; }
 
-# Fine-grained PAT für Mission Control (Demo-Steuerung + GitHub-Live) aus der
-# lokalen, nie committeten Datei laden — Compose substituiert MC_GITHUB_TOKEN.
+# Fine-grained PAT für Mission Control (Demo-Steuerung + GitHub-Live).
+# Bevorzugt aus dem macOS-Keychain (verschlüsselt at rest; Zugriff funktioniert
+# hier, weil stacks.sh in der interaktiven User-Session läuft), Fallback: lokale
+# Datei. Compose substituiert MC_GITHUB_TOKEN in die Container-Umgebung.
+MC_KEYCHAIN_SERVICE="nextgen-mission-control"
+
 load_mc_token() {
+  MC_GITHUB_TOKEN="$(security find-generic-password -s "$MC_KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true)"
+  if [ -n "$MC_GITHUB_TOKEN" ]; then
+    export MC_GITHUB_TOKEN
+    return 0
+  fi
   MC_ENV_FILE="$HOME/deployments/mission-control.env"
   if [ -f "$MC_ENV_FILE" ]; then
     set -a
     # shellcheck disable=SC1090
     . "$MC_ENV_FILE"
     set +a
-  else
-    echo "── Hinweis: $MC_ENV_FILE fehlt — Mission Control läuft ohne GitHub-Live/Demo-Steuerung." >&2
-    echo "   Einrichten: Fine-grained PAT erstellen (siehe README) und speichern mit:" >&2
-    echo "   printf 'MC_GITHUB_TOKEN=%s\\n' '<dein-token>' > \"$MC_ENV_FILE\" && chmod 600 \"$MC_ENV_FILE\"" >&2
+    return 0
   fi
+  echo "── Hinweis: Kein Mission-Control-Token — GitHub-Live/Demo-Steuerung bleiben aus." >&2
+  echo "   Einrichten (empfohlen, Keychain): $0 token" >&2
 }
 
 # Gedeckelter Engine-Ping statt `docker info`: der CLI-Aufruf kann gegen einen
@@ -138,8 +146,30 @@ case "$CMD" in
     OPS_COUNT="$(docker compose -p nextgen-ops ps -q 2>/dev/null | grep -c . || true)"
     printf '%-8s %-9s %-23s %s Container\n' "ops" "$([ "${OPS_COUNT:-0}" -gt 0 ] && echo '✅ läuft' || echo '⛔ aus')" "(Grafana/Portainer/ops-db)" "${OPS_COUNT:-0}"
     ;;
+  token)
+    echo "Fine-grained PAT für Mission Control im macOS-Keychain speichern."
+    echo "(Erstellen: https://github.com/settings/personal-access-tokens/new —"
+    echo " nur Repo NextGen-CICD; Actions R+W, Deployments R+W, Contents R)"
+    printf 'Token (Eingabe unsichtbar): '
+    read -r -s MC_TOKEN_INPUT
+    echo ""
+    if [ -z "$MC_TOKEN_INPUT" ]; then
+      echo "Abgebrochen — kein Token eingegeben." >&2
+      exit 1
+    fi
+    # -U: vorhandenen Eintrag aktualisieren statt Duplikat anlegen.
+    security add-generic-password -U -s "$MC_KEYCHAIN_SERVICE" -a "$USER" -w "$MC_TOKEN_INPUT"
+    unset MC_TOKEN_INPUT
+    if [ -f "$HOME/deployments/mission-control.env" ]; then
+      rm -f "$HOME/deployments/mission-control.env"
+      echo "✅ Token im Keychain gespeichert; alte Klartext-Datei entfernt."
+    else
+      echo "✅ Token im Keychain gespeichert."
+    fi
+    echo "   Aktivieren mit: $0 up"
+    ;;
   *)
-    echo "Unbekanntes Kommando: $CMD (up|stop|down|status)" >&2
+    echo "Unbekanntes Kommando: $CMD (up|stop|down|status|token)" >&2
     exit 1
     ;;
 esac
