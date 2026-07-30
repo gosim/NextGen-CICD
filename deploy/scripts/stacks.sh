@@ -7,7 +7,10 @@
 # Flag für stop/down: --keep-docker lässt Docker Desktop weiterlaufen.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# readlink -f: auch bei Aufruf über einen Symlink (z.B. /opt/homebrew/bin/nextgen-stacks)
+# zur echten Datei auflösen, sonst zeigt ROOT ins Leere.
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 OPS_FILE="$ROOT/deploy/compose/docker-compose.ops.yml"
 STATE="$ROOT/deploy/scripts/state.sh"
 ENVS="int abnahme prod"
