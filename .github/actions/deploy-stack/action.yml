@@ -1,9 +1,12 @@
 name: 'Stack deployen'
 description: >-
-  Deployt einen Image-Tag in eine Umgebung: State lesen, pg_dump-Backup,
-  Keychain-freier GHCR-Login, Rolling-Deployment via deploy.sh, State + Ops-Event.
+  Deployt einen Image-Tag in eine Umgebung: State lesen, Keychain-freier
+  GHCR-Login, Rolling-Deployment via deploy.sh, State + Ops-Event.
   Wird vom vollen Deploy-Workflow (_deploy.yml) und vom schlanken PROD-Workflow
-  (_deploy-simple.yml) gemeinsam genutzt.
+  (_deploy-simple.yml) gemeinsam genutzt. Das pg_dump-Backup ist BEWUSST ein
+  eigener Step in den aufrufenden Workflows: Composite-Schritte erscheinen in der
+  Jobs-API nicht einzeln — nur als Top-Level-Step ist das Backup für Mission
+  Control sichtbar (CONTRACT §4: Step-Name enthält „Datenbank-Backup").
 
 inputs:
   env_key:
@@ -29,9 +32,6 @@ outputs:
   last_green:
     description: 'Letzte grüne Version VOR diesem Deployment (Rollback-Ziel)'
     value: ${{ steps.state.outputs.last_green }}
-  backup_file:
-    description: 'Pfad des Pre-Deploy-Backups (leer beim Bootstrap)'
-    value: ${{ steps.backup.outputs.backup_file }}
 
 runs:
   using: composite
@@ -43,15 +43,6 @@ runs:
         LAST_GREEN="$(deploy/scripts/state.sh get ${{ inputs.env_key }} last_green)"
         echo "last_green=${LAST_GREEN}" >> "$GITHUB_OUTPUT"
         echo "Letzte grüne Version: ${LAST_GREEN:-<keine — Bootstrap>}"
-    - name: Datenbank-Backup (pg_dump) vor dem Deployment
-      id: backup
-      shell: bash
-      run: |
-        BACKUP_FILE="$(IMAGE_TAG='${{ inputs.image_tag }}' deploy/scripts/backup.sh ${{ inputs.env_key }})"
-        echo "backup_file=${BACKUP_FILE}" >> "$GITHUB_OUTPUT"
-        if [ -n "$BACKUP_FILE" ]; then
-          deploy/scripts/state.sh set ${{ inputs.env_key }} last_backup="$BACKUP_FILE"
-        fi
     # Keychain-freie Docker-Config: im LaunchAgent-Kontext des Runners ist
     # Keychain-Zugriff verboten ("User interaction is not allowed").
     - name: GHCR-Login (Keychain-frei)

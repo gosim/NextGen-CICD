@@ -44,6 +44,15 @@ jobs:
       packages: read
     steps:
       - uses: actions/checkout@v4
+      # Eigener Top-Level-Step (nicht in der Composite-Action): nur so taucht das
+      # Backup in der Jobs-API auf und Mission Control kann es visualisieren.
+      # last_backup im State ist zugleich das Restore-Ziel des manuellen Rollbacks.
+      - name: Datenbank-Backup (pg_dump) vor dem Deployment
+        run: |
+          BACKUP_FILE="$(IMAGE_TAG='${{ inputs.image_tag }}' deploy/scripts/backup.sh ${{ inputs.env_key }})"
+          if [ -n "$BACKUP_FILE" ]; then
+            deploy/scripts/state.sh set ${{ inputs.env_key }} last_backup="$BACKUP_FILE"
+          fi
       - name: Stack deployen (Rolling, ohne nachgelagertes Gate)
         uses: ./.github/actions/deploy-stack
         with:
