@@ -32,6 +32,7 @@ interface ApiRun {
   status: string;
   conclusion: string | null;
   created_at: string;
+  updated_at?: string;
   run_started_at?: string;
   head_commit?: { message?: string } | null;
 }
@@ -177,14 +178,42 @@ function workflowKindOf(path: string): WorkflowKind {
   return path.endsWith(STABILITY_PATH) ? 'stability' : 'pipeline';
 }
 
-/** Aktiver Lauf (in_progress/waiting/queued) bevorzugt, sonst neuester abgeschlossener. */
-function chooseRun(runs: ApiRun[]): ApiRun {
+/**
+ * Lauf-Auswahl mit Story-Priorität: Die Pipeline-Erzählung (z. B. rotes Gate +
+ * Rollback) darf nicht sofort von einem stündlichen Stabilitäts-Check aus dem
+ * Band verdrängt werden.
+ *   1. aktiver pipeline-Lauf (queued/in_progress/waiting)
+ *   2. kürzlich beendeter pipeline-Lauf (≤ STORY_HOLD_MS)
+ *   3. aktiver stability-Lauf
+ *   4. neuester Lauf
+ * (Live-Testfälle eines Checks kommen unabhängig davon über den Ingest-Kanal.)
+ */
+export const STORY_HOLD_MS = 10 * 60 * 1000;
+
+export function chooseRun(runs: ApiRun[], now: number = Date.now()): ApiRun {
   const byNewest = [...runs].sort(
     (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
   );
-  const active = byNewest.find((run) => run.status !== 'completed');
-  return active ?? byNewest[0]!;
+  const isActive = (run: ApiRun): boolean => run.status !== 'completed';
+  const isPipeline = (run: ApiRun): boolean => workflowKindOf(run.path) === 'pipeline';
+
+  const activePipeline = byNewest.find((run) => isActive(run) && isPipeline(run));
+  if (activePipeline) return activePipeline;
+
+  const recentPipeline = byNewest.find(
+    (run) =>
+      isPipeline(run) &&
+      now - Date.parse(run.updated_at ?? run.created_at) <= STORY_HOLD_MS,
+  );
+  if (recentPipeline) return recentPipeline;
+
+  const activeStability = byNewest.find(isActive);
+  if (activeStability) return activeStability;
+
+  return byNewest[0]!;
 }
+
+export type { ApiRun };
 
 function toJobView(job: ApiJob): GithubJobView {
   return {

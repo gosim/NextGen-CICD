@@ -48,6 +48,7 @@ GitHubs Actions-Graph ordnet Jobs strikt nach Abhängigkeit an — das ist nicht
 - **Graph (rechts): der Fluss.** Spalten = Reihenfolge: `CI → INT → Abnahme → PROD`. Innerhalb einer Umgebungs-Box läuft es von links nach rechts: `🚀 Deploy → 🛡 Quality Gate → ⛑ Rollback`. **Untereinander** stehen nur Jobs, die parallel laufen (die drei `📦 Image`-Builds in der CI-Box — ein schöner Nebensatz zur Parallelisierung).
 - **Job-Sidebar (links): die vertikale Sicht.** Dort stehen die drei Stationen jeder Umgebung untereinander, gruppiert nach INT/Abnahme/PROD — ideal, wenn du die Stufen stapelweise durchgehen willst.
 - **Tipp:** Akt 1 im Graph moderieren (der Fluss durch die Gates), Akt 2 mit der INT-Box im Graph (rotes Gate, **grüner** Rollback direkt daneben — das Bild des Tages) plus Sidebar für die Details.
+- **Nicht verwirren lassen:** Der 🔍 Stabilitäts-Check startet **stündlich automatisch** — taucht er während der Demo auf, gehört er NICHT zum Rollback (der stellt die letzte grüne Version direkt wieder her). Guter Nebensatz ans Publikum: „So überwachen wir die Umgebungen auch *zwischen* den Deployments." Mission Control hält die Pipeline-Story ohnehin 10 Minuten im Band, bevor ein Check sie ablösen darf.
 
 ## 3. Die vier Akte
 
