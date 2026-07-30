@@ -1,7 +1,7 @@
 import { deriveChoreography } from './choreography.js';
 import { idlePipelineStages } from './stages.js';
 import type {
-  BackupDump,
+  BackupsState,
   EnvKey,
   EnvironmentState,
   GithubJobView,
@@ -48,7 +48,7 @@ function initialSnapshot(): Snapshot {
     },
     choreography: { active: [], flows: [], alarm: null },
     registry: { images: [] },
-    backups: { dumps: [] },
+    backups: { int: null, abnahme: null, prod: null },
     environments: {
       int: emptyEnvironment(),
       abnahme: emptyEnvironment(),
@@ -136,9 +136,9 @@ export class StateStore {
     this.scheduleBroadcast();
   }
 
-  /** Dump-Stapel setzen (vom Backups-Poller): letzte 3 pg_dump-Dateien, neueste zuerst. */
-  setBackups(dumps: BackupDump[]): void {
-    this.snapshot.backups = { dumps };
+  /** Backup-Bank setzen (vom Backups-Poller): je Umgebung neuester Dump + Anzahl. */
+  setBackups(backups: BackupsState): void {
+    this.snapshot.backups = backups;
     this.scheduleBroadcast();
   }
 

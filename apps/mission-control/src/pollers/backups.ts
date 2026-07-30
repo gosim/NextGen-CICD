@@ -1,24 +1,18 @@
-import type { Dirent } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Config } from '../config.js';
 import type { StateStore } from '../state.js';
-import type { BackupDump, EnvKey } from '../types.js';
+import type { BackupsState, BackupSummary, EnvKey } from '../types.js';
 
 // Backups-Poller (alle 10 s). Liest den read-only Host-Mount `BACKUPS_DIR` mit je
-// einem Unterordner pro Umgebung (`/backups/<env>/*.dump`), sammelt alle pg_dump-
-// Dateien und stellt die global neuesten drei als Dump-Stapel bereit. Verzeichnis
-// fehlt/Lesefehler ⇒ leere Liste, kein Crash (fail-safe).
+// einem Unterordner pro Umgebung (`/backups/<env>/*.dump`) und stellt je Umgebung
+// den NEUESTEN Dump plus Gesamtanzahl bereit (Backup-Bank unter den Env-Boxen).
+// Verzeichnis fehlt/Lesefehler ⇒ null je Umgebung, kein Crash (fail-safe).
 
 const POLL_INTERVAL_MS = 10000;
 const DUMP_SUFFIX = '.dump';
-const MAX_DUMPS = 3;
 
 const ENV_KEYS: readonly EnvKey[] = ['int', 'abnahme', 'prod'];
-
-function isEnvKey(value: string): value is EnvKey {
-  return (ENV_KEYS as readonly string[]).includes(value);
-}
 
 export class BackupsPoller {
   private timer: NodeJS.Timeout | null = null;
@@ -51,66 +45,58 @@ export class BackupsPoller {
       // Sollte dank interner Absicherung nicht auftreten — zur Sicherheit leerer
       // Stapel statt Crash.
       console.warn('Backups-Poll fehlgeschlagen:', (error as Error).message);
-      this.state.setBackups([]);
+      this.state.setBackups({ int: null, abnahme: null, prod: null });
     } finally {
       this.running = false;
     }
   }
 }
 
-/** Interner Träger für die Sortierung nach Änderungszeit. */
-interface ScannedDump extends BackupDump {
-  mtimeMs: number;
-}
-
 /**
- * Durchsucht `<baseDir>/<env>/*.dump` und gibt die global neuesten drei Dumps
- * zurück (neueste zuerst). Fehlt der Basisordner oder ist er nicht lesbar, wird
- * eine leere Liste geliefert — nie geworfen.
+ * Durchsucht `<baseDir>/<env>/*.dump` und liefert je Umgebung den neuesten Dump
+ * plus Gesamtanzahl. Fehlt der Basisordner oder ein Unterordner, ist der Eintrag
+ * null — nie geworfen.
  */
-export async function scanBackups(baseDir: string): Promise<BackupDump[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(baseDir, { withFileTypes: true });
-  } catch {
-    return []; // Verzeichnis fehlt o. Ä. → leerer Dump-Stapel.
-  }
+export async function scanBackups(baseDir: string): Promise<BackupsState> {
+  const result: BackupsState = { int: null, abnahme: null, prod: null };
 
-  const found: ScannedDump[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const env: EnvKey | null = isEnvKey(entry.name) ? entry.name : null;
-    const dir = join(baseDir, entry.name);
-
+  for (const env of ENV_KEYS) {
+    const dir = join(baseDir, env);
     let files: string[];
     try {
       files = await readdir(dir);
     } catch {
-      continue; // Unterordner nicht lesbar → überspringen.
+      continue; // Ordner fehlt/nicht lesbar → Umgebung bleibt null.
     }
 
+    let newest: (BackupSummary & { mtimeMs: number }) | null = null;
+    let count = 0;
     for (const file of files) {
       if (!file.endsWith(DUMP_SUFFIX)) continue;
       try {
         const info = await stat(join(dir, file));
         if (!info.isFile()) continue;
-        found.push({
-          env,
-          at: info.mtime.toISOString(),
-          sizeBytes: info.size,
-          tag: parseTag(file),
-          mtimeMs: info.mtimeMs,
-        });
+        count += 1;
+        if (!newest || info.mtimeMs > newest.mtimeMs) {
+          newest = {
+            at: info.mtime.toISOString(),
+            sizeBytes: info.size,
+            tag: parseTag(file),
+            count: 0, // wird unten gesetzt
+            mtimeMs: info.mtimeMs,
+          };
+        }
       } catch {
         // Datei zwischen readdir und stat verschwunden → ignorieren.
       }
     }
+
+    if (newest) {
+      result[env] = { at: newest.at, sizeBytes: newest.sizeBytes, tag: newest.tag, count };
+    }
   }
 
-  return found
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)
-    .slice(0, MAX_DUMPS)
-    .map(({ mtimeMs: _mtimeMs, ...dump }) => dump);
+  return result;
 }
 
 /**

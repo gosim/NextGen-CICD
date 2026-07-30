@@ -121,7 +121,7 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
       // Rollback zieht das letzte Image von der Stapel-Spitze und die DB aus dem
       // Backup zurück — daher ghcr aktiv.
       active.add(`${env}-db`);
-      active.add('backup-store');
+      active.add(`backup-${env}`);
       active.add('ghcr');
       flows.add(`${env}-restore`);
       flows.add(`${env}-rollback-pull`);
@@ -136,7 +136,7 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
 
       if (env && name.includes('Datenbank-Backup')) {
         active.add(`${env}-db`);
-        active.add('backup-store');
+        active.add(`backup-${env}`);
         flows.add(`${env}-backup`);
       }
 

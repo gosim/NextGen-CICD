@@ -294,7 +294,7 @@ function renderTestList(cases) {
     let li = el.testList.querySelector(`.test-case[data-id="${cssEscape(c.id)}"]`);
     if (!li) {
       li = document.createElement('li');
-      li.className = 'test-case slide-in';
+      li.className = 'test-case';
       li.dataset.id = c.id;
       li.innerHTML =
         '<span class="tc-ic" aria-hidden="true"></span>' +
@@ -315,8 +315,8 @@ function renderTestList(cases) {
 
 /**
  * Kompaktzeile für Nicht-Regression-Suiten: „🛡 <Suite> gegen <ENV>: n/total"
- * — Gesamt-Spinner solange aktiv, danach ✓ grün / ✗ rot (+k flaky gelb).
- * Keine Einzel-Einträge, keine Slide-Effekte.
+ * — statischer „…läuft"-Text solange aktiv, danach ✓ grün / ✗ rot (+k flaky gelb).
+ * Keine Einzel-Einträge, keine Slide-/Spin-Effekte (beruhigtes Panel).
  */
 function renderTestCompact(tests) {
   const s = tests.summary || {};
@@ -348,10 +348,11 @@ function renderTestCompact(tests) {
   el.testCompact.append(shield, label, count);
 
   if (active) {
-    const spin = document.createElement('span');
-    spin.className = 'tcx-spin';
-    spin.setAttribute('aria-hidden', 'true');
-    el.testCompact.append(spin);
+    // Beruhigte Kompaktzeile: statischer „…läuft"-Text statt Dreh-Spinner.
+    const running = document.createElement('span');
+    running.className = 'tcx-running';
+    running.textContent = '…läuft';
+    el.testCompact.append(running);
   } else {
     const res = document.createElement('span');
     res.className = 'tcx-res ' + (failed > 0 ? 'fail' : 'ok');
@@ -372,17 +373,10 @@ function updateCase(li, c) {
   if (li.dataset.status !== status) li.dataset.status = status;
 
   const icCell = li.querySelector('.tc-ic');
-  if (status === 'running') {
-    if (!icCell.querySelector('.tc-spin')) {
-      icCell.textContent = '';
-      const spin = document.createElement('span');
-      spin.className = 'tc-spin';
-      icCell.appendChild(spin);
-    }
-  } else {
-    const sym = TC_SYMBOL[status] || '•';
-    if (icCell.textContent !== sym) icCell.textContent = sym;
-  }
+  // Beruhigtes Panel: laufende Tests bekommen ein statisches „○" (kein rotierender
+  // Spinner) — Statuswechsel ist ein reiner Icon-/Farbwechsel.
+  const sym = status === 'running' ? '○' : TC_SYMBOL[status] || '•';
+  if (icCell.textContent !== sym) icCell.textContent = sym;
 
   const title = li.querySelector('.tc-title');
   if (title.textContent !== c.title) {
@@ -568,12 +562,19 @@ function renderRegistry(state) {
   // dezent auf noch nicht promoteten Karten.
   const latestPromotedIdx = images.findIndex((im) => im?.promoted === true);
 
+  // Deploy-Lese-Hervorhebung: läuft ein <env>-pull, glüht die Karte, deren Version
+  // gerade in eine Umgebung gezogen wird (github.run.version, Fallback images[0]).
+  const flows = new Set(state.choreography?.flows || []);
+  const pullActive = ENVS.some((e) => flows.has(`${e}-pull`));
+  const readVersion = state.github?.run?.version ?? images[0]?.version ?? null;
+
   for (let i = 0; i < GHCR_SLOTS; i++) {
     const card = document.getElementById(`ghcr-card-${i}`);
     if (!card) continue;
     fillGhcrCard(card, images[i], environments);
     card.classList.toggle('is-latest', i === latestPromotedIdx);
     card.classList.toggle('is-neu', !!images[i]?.version && images[i]?.promoted !== true);
+    card.classList.toggle('pull-glow', pullActive && !!images[i]?.version && images[i].version === readVersion);
   }
 
   // Stapel-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
@@ -647,9 +648,9 @@ function fillGhcrCard(card, img, environments) {
     chips.dataset.envs = want;
     chips.textContent = '';
     matching.forEach((env, idx) => {
-      const g = svg('g', { class: `ghcr-chip chip-${env}`, transform: `translate(${14 + idx * 52},58)` });
-      g.appendChild(svg('rect', { x: '0', y: '0', width: '48', height: '24', rx: '12', class: 'ghcr-chip-bg' }));
-      const t = svg('text', { x: '24', y: '17', 'text-anchor': 'middle', class: 'ghcr-chip-txt' });
+      const g = svg('g', { class: `ghcr-chip chip-${env}`, transform: `translate(${12 + idx * 50},52)` });
+      g.appendChild(svg('rect', { x: '0', y: '0', width: '46', height: '24', rx: '12', class: 'ghcr-chip-bg' }));
+      const t = svg('text', { x: '23', y: '17', 'text-anchor': 'middle', class: 'ghcr-chip-txt' });
       t.textContent = ENV_CHIP[env];
       g.appendChild(t);
       chips.appendChild(g);
@@ -658,78 +659,59 @@ function fillGhcrCard(card, img, environments) {
 }
 
 // --------------------------------------------------------------------------
-// BACKUP — DUMP-STAPEL (analog zum GHCR-Stapel)
+// BACKUP-BANK — je Umgebung ein Dump-Stapel mittig unter seiner Env-Box
 // --------------------------------------------------------------------------
-const BACKUP_SLOTS = 3;
-/** Zuletzt gerenderte Dump-Stapel-Spitze — Wechsel löst die Slide-Animation aus. */
-let lastBackupTop = null;
 
 /**
- * Rendert den Dump-Stapel (max. 3 Karten, oben = neueste).
- * Quelle: state.backups.dumps. Je Karte: Env-Chip, Uhrzeit (fmtTime), Größe (kB).
- * Neue oberste Karte gleitet ein, die übrigen rücken nach (GHCR-Keyframes wiederverwendet).
- * Bei aktivem *-restore-Flow glüht die Spitze (backup-card-0) rot (§3).
+ * Rendert die drei Dump-Stapel (backup-int / -abnahme / -prod) aus der v4-Datenform
+ * state.backups.<env> = { at, sizeBytes, tag, count } | null.
+ * Je Stapel: sichtbare oberste Karte (Zeit via fmtTime, Größe in kB) + Anzahl-Badge
+ * („×count"); null ⇒ gestrichelter Platzhalter „kein Backup".
+ * Bei aktivem <env>-backup- ODER <env>-restore-Flow pulsiert der Stapelrahmen (.active);
+ * bei restore zusätzlich rote Glut auf der sichtbaren Karte (.restoring, §3).
  */
 function renderBackups(state) {
-  const dumps = Array.isArray(state.backups?.dumps) ? state.backups.dumps.slice(0, BACKUP_SLOTS) : [];
-  const top = dumps[0] ? `${dumps[0].env}|${dumps[0].at}` : null;
-  const isNewTop = lastBackupTop !== null && top !== null && top !== lastBackupTop;
-
-  for (let i = 0; i < BACKUP_SLOTS; i++) {
-    const card = document.getElementById(`backup-card-${i}`);
-    if (!card) continue;
-    fillBackupCard(card, dumps[i]);
-  }
-
-  // Slide-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
-  if (isNewTop && !prefersReducedMotion.matches) {
-    for (let i = 0; i < BACKUP_SLOTS; i++) {
-      const card = document.getElementById(`backup-card-${i}`);
-      if (!card || card.classList.contains('empty')) continue;
-      const cls = i === 0 ? 'card-enter' : 'card-shift';
-      card.classList.remove('card-enter', 'card-shift');
-      void card.getBoundingClientRect(); // Reflow erzwingen → Keyframe neu starten
-      card.classList.add(cls);
-    }
-  }
-  lastBackupTop = top;
-
-  // Stapel-Spitze glüht rot, solange eine Wiederherstellung läuft (§3, analog rollback-pull)
+  const backups = state.backups || {};
   const flows = new Set(state.choreography?.flows || []);
-  const restoreActive = [...flows].some((f) => f.endsWith('-restore'));
-  const topCard = document.getElementById('backup-card-0');
-  if (topCard) topCard.classList.toggle('glow', restoreActive);
+
+  ENVS.forEach((env) => {
+    const stack = el.map.querySelector(`[data-component="backup-${env}"]`);
+    if (!stack) return;
+    fillBackupStack(stack, backups[env]);
+
+    const backupActive = flows.has(`${env}-backup`);
+    const restoreActive = flows.has(`${env}-restore`);
+    stack.classList.toggle('active', backupActive || restoreActive);
+    stack.classList.toggle('restoring', restoreActive);
+  });
 }
 
-/** Füllt eine einzelne Dump-Karte (oder markiert sie als leer/gestrichelt). */
-function fillBackupCard(card, dump) {
-  const chip = card.querySelector('.backup-chip');
-  const chipTxt = card.querySelector('.backup-chip-txt');
-  const timeTxt = card.querySelector('.backup-time');
-  const sizeTxt = card.querySelector('.backup-size');
+/** Füllt einen einzelnen Dump-Stapel (oder schaltet auf den Platzhalter „kein Backup"). */
+function fillBackupStack(stack, entry) {
+  const hasData = !!(entry && entry.at);
+  stack.classList.toggle('empty', !hasData);
 
-  if (!dump || !dump.env) {
-    card.classList.add('empty');
-    if (chip.getAttribute('class') !== 'backup-chip') chip.setAttribute('class', 'backup-chip');
-    if (chipTxt.textContent !== '') chipTxt.textContent = '';
-    if (timeTxt.textContent !== '') timeTxt.textContent = '';
+  const timeTxt = stack.querySelector('.backup-time');
+  const sizeTxt = stack.querySelector('.backup-size');
+  const countTxt = stack.querySelector('.backup-count-txt');
+
+  if (!hasData) {
+    if (timeTxt.textContent !== '—') timeTxt.textContent = '—';
     if (sizeTxt.textContent !== '') sizeTxt.textContent = '';
-    card.dataset.key = '';
+    if (countTxt.textContent !== '') countTxt.textContent = '';
+    stack.dataset.key = '';
     return;
   }
 
-  card.classList.remove('empty');
-  const key = `${dump.env}|${dump.at}|${dump.sizeBytes}`;
-  if (card.dataset.key === key) return; // idempotent — nichts geändert
-  card.dataset.key = key;
+  const kb = Math.round((entry.sizeBytes || 0) / 1024);
+  const count = entry.count || 0;
+  const key = `${entry.at}|${entry.sizeBytes}|${count}`;
+  if (stack.dataset.key === key) return; // idempotent — nichts geändert
+  stack.dataset.key = key;
 
-  chip.setAttribute('class', `backup-chip chip-${dump.env}`);
-  chipTxt.textContent = ENV_CHIP[dump.env] || String(dump.env).toUpperCase();
-
-  timeTxt.textContent = fmtTime(dump.at);
-
-  const kb = Math.round((dump.sizeBytes || 0) / 1024);
+  timeTxt.textContent = fmtTime(entry.at);
   sizeTxt.textContent = `${kb.toLocaleString('de-DE')} kB`;
+  countTxt.textContent = `×${count}`;
 }
 
 // --------------------------------------------------------------------------

@@ -47,7 +47,7 @@ describe('deriveChoreography', () => {
         ]),
       ]),
     );
-    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-store']));
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int']));
     expect(result.flows).toContain('int-backup');
     expect(result.alarm).toBeNull();
   });
@@ -121,7 +121,7 @@ describe('deriveChoreography', () => {
         ]),
       ]),
     );
-    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-store', 'ghcr']));
+    expect(result.active).toEqual(expect.arrayContaining(['int-db', 'backup-int', 'ghcr']));
     expect(result.active).not.toContain('runner');
     expect(result.flows).toEqual(
       expect.arrayContaining(['int-restore', 'int-rollback-pull']),

@@ -53,7 +53,7 @@ export interface Alarm {
 // ── Architektur-Karte: Komponenten & Flüsse (CONTRACT §2/§3, v2) ─────────────
 
 /** Globale Komponenten der Architektur-Karte (CONTRACT §2, v3: `runner` entfällt). */
-export type GlobalComponentId = 'github-ci' | 'ghcr' | 'backup-store' | 'playwright';
+export type GlobalComponentId = 'github-ci' | 'ghcr' | `backup-${EnvKey}` | 'playwright';
 
 /** Komponenten je Umgebung — bewusst vereinfachte Zuschauer-Sicht (CONTRACT §2). */
 export type EnvComponentId = `${EnvKey}-frontend` | `${EnvKey}-backend` | `${EnvKey}-db`;
@@ -135,20 +135,18 @@ export interface RegistryState {
   images: RegistryImage[];
 }
 
-/** Eine pg_dump-Datei im Dump-Stapel (CONTRACT §1 „backups"). */
-export interface BackupDump {
-  /** Umgebung aus dem Ordnernamen (`/backups/<env>/…`); null bei unbekanntem Ordner. */
-  env: EnvKey | null;
+/** Neuester pg_dump einer Umgebung + Gesamtanzahl (CONTRACT §1 „backups", v4). */
+export interface BackupSummary {
   at: string;
   sizeBytes: number;
   /** Tag aus dem Dateinamen-Muster `<timestamp>_<tag>.dump`; null wenn nicht ableitbar. */
   tag: string | null;
+  /** Gesamtanzahl vorhandener Dumps dieser Umgebung. */
+  count: number;
 }
 
-/** Der Dump-Stapel: die letzten drei pg_dump-Dateien, neueste zuerst. */
-export interface BackupsState {
-  dumps: BackupDump[];
-}
+/** Backup-Bank: je Umgebung der neueste Dump (null = keine Dumps vorhanden). */
+export type BackupsState = Record<EnvKey, BackupSummary | null>;
 
 export interface Snapshot {
   generatedAt: string;

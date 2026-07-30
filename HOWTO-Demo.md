@@ -30,7 +30,7 @@ curl -fsS http://localhost:8000/api/health | jq -r .database
 
 | Tab/Fenster | URL | Zweck |
 |---|---|---|
-| **Beamer-Anker: Mission Control** | `http://localhost:9100` | Live-Prozess: Pipeline-Band, INT-Testfälle in Echtzeit, Promotionskette **INT → Abnahme → PROD** mit ⏸-Freigabe-Symbolen, vereinfachte Umgebungs-Boxen (Frontend/Backend/DB) und der **GHCR-Image-Stapel** (letzte 3 Versionen: neue grüne Version landet oben, beim Rollback wird sichtbar die oberste vom Stapel gezogen) — **plus 🎬 Demo-Steuerung**: alle Szenarien und Freigaben per Button, kein Wechsel zu GitHub nötig |
+| **Beamer-Anker: Mission Control** | `http://localhost:9100` | Live-Prozess: Pipeline-Band, INT-Testfälle in Echtzeit (bewusst ohne Animations-Effekte), Promotionskette **INT → Abnahme → PROD** mit ⏸-Freigabe-Symbolen, **GHCR-Image-Stapel** links (LATEST-✓-Band = die Version, die ein Rollback zieht; beim Deploy glüht die gerade gezogene Karte) und die **Backup-Bank** direkt unter den Umgebungen (je Env der neueste pg_dump, pulsiert bei Backup/Restore) — **plus 🎬 Demo-Steuerung**: alle Szenarien und Freigaben per Button |
 | Grafana (Zweit-Tab) | `http://localhost:8000` | Metriken & Historie: Stabilität-Bänder, Deployment-Historie, Flaky-Trend |
 | GitHub Actions | `https://github.com/gosim/NextGen-CICD/actions` | Pipeline-Läufe live |
 | GitHub Environments | `https://github.com/gosim/NextGen-CICD/deployments` | „Welche Version läuft wo" aus GitHub-Sicht |

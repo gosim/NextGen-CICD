@@ -112,53 +112,57 @@
           </defs>
 
           <!-- Spaltenbeschriftungen -->
-          <text class="col-label" x="157" y="30" text-anchor="middle">GitHub</text>
-          <text class="col-label" x="410" y="30" text-anchor="middle">Tests &amp; Sicherungen</text>
-          <text class="col-label" x="1080" y="30" text-anchor="middle">Umgebungen — Promotionskette</text>
+          <text class="col-label" x="170" y="42" text-anchor="middle">GitHub · CI/CD</text>
+          <text class="col-label" x="960" y="42" text-anchor="middle">Umgebungen — Promotionskette</text>
+          <text class="col-label sub" x="960" y="600" text-anchor="middle">Sicherungen — pg_dump</text>
 
           <!-- Kettenpfeile der Promotionskette (unterste Ebene, unter den Flüssen) -->
           <g class="chain-arrows" aria-hidden="true">
-            <path class="chain-arrow" d="M870 420 L931 420" marker-end="url(#chain-head)" />
-            <path class="chain-arrow" d="M1223 420 L1284 420" marker-end="url(#chain-head)" />
+            <path class="chain-arrow" d="M700 270 L788 270" marker-end="url(#chain-head)" />
+            <path class="chain-arrow" d="M1130 270 L1218 270" marker-end="url(#chain-head)" />
           </g>
 
           <!-- ===================== FLÜSSE (unterste Ebene) ===================== -->
           <g id="flows-layer" fill="none">
-            <path id="flow-ci-build" class="flow-path" d="M150 162 L150 248" />
-            <path id="flow-registry-push" class="flow-path" d="M585 220 C440 170 330 200 256 276" />
+            <!-- CI → GHCR (kurz vertikal) -->
+            <path id="flow-ci-build" class="flow-path" d="M170 162 L170 226" />
+            <!-- Image hat die Gates bestanden → landet oben auf dem GHCR-Stapel -->
+            <path id="flow-registry-push" class="flow-path" d="M360 252 C300 250 250 244 178 236" />
 
-            <!-- INT -->
-            <path id="flow-int-pull" class="flow-path" d="M256 385 C420 340 480 300 585 300" />
-            <path id="flow-int-test" class="flow-path" d="M508 125 C548 180 560 250 585 300" />
-            <path id="flow-int-backup" class="flow-path" d="M672 545 C600 500 545 400 512 322" />
-            <path id="flow-int-restore" class="flow-path flow-restore" d="M512 330 C560 420 600 480 672 540" />
-            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M256 278 C420 210 470 230 585 250" />
+            <!-- <env>-pull: GHCR-Stapel fächernd zu den drei Boxen -->
+            <path id="flow-int-pull" class="flow-path" d="M300 320 C356 262 322 186 358 154" />
+            <path id="flow-abnahme-pull" class="flow-path" d="M300 350 C540 302 642 202 788 160" />
+            <path id="flow-prod-pull" class="flow-path" d="M300 380 C642 360 980 214 1218 168" />
 
-            <!-- ABNAHME -->
-            <path id="flow-abnahme-pull" class="flow-path" d="M256 395 C520 470 720 320 938 300" />
-            <path id="flow-abnahme-test" class="flow-path" d="M508 130 C690 190 820 270 938 305" />
-            <path id="flow-abnahme-backup" class="flow-path" d="M1005 540 C760 470 620 380 512 312" />
-            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M512 320 C640 400 800 470 1005 535" />
-            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M256 283 C520 360 720 250 938 260" />
+            <!-- <env>-test: Playwright fächernd zu den drei Boxen -->
+            <path id="flow-int-test" class="flow-path" d="M200 600 C282 524 332 470 360 412" />
+            <path id="flow-abnahme-test" class="flow-path" d="M222 600 C500 548 652 470 788 412" />
+            <path id="flow-prod-test" class="flow-path" d="M244 600 C644 566 980 470 1218 412" />
 
-            <!-- PROD -->
-            <path id="flow-prod-pull" class="flow-path" d="M256 405 C560 540 900 360 1291 300" />
-            <path id="flow-prod-test" class="flow-path" d="M510 135 C770 220 1050 300 1291 325" />
-            <path id="flow-prod-backup" class="flow-path" d="M1358 540 C980 470 700 370 512 304" />
-            <path id="flow-prod-restore" class="flow-path flow-restore" d="M512 312 C720 390 1050 460 1358 535" />
-            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M256 288 C560 440 900 320 1291 270" />
+            <!-- <env>-backup: kurze Vertikale DB → eigener Dump-Stapel -->
+            <path id="flow-int-backup" class="flow-path" d="M523 446 L523 652" />
+            <path id="flow-int-restore" class="flow-path flow-restore" d="M537 652 L537 446" />
+            <path id="flow-abnahme-backup" class="flow-path" d="M953 446 L953 652" />
+            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M967 652 L967 446" />
+            <path id="flow-prod-backup" class="flow-path" d="M1383 446 L1383 652" />
+            <path id="flow-prod-restore" class="flow-path flow-restore" d="M1397 652 L1397 446" />
+
+            <!-- <env>-rollback-pull: GHCR-Spitze → Box (rot, oberste Karte glüht) -->
+            <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M300 240 C356 206 330 170 358 148" />
+            <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M300 248 C540 198 642 166 788 148" />
+            <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M300 256 C644 236 980 174 1218 152" />
 
             <!-- Promotionskette (entlang der Kettenpfeile) -->
-            <path id="flow-promote-int-abnahme" class="flow-path flow-promote" d="M870 420 L938 420" />
-            <path id="flow-promote-abnahme-prod" class="flow-path flow-promote" d="M1223 420 L1291 420" />
+            <path id="flow-promote-int-abnahme" class="flow-path flow-promote" d="M700 270 L788 270" />
+            <path id="flow-promote-abnahme-prod" class="flow-path flow-promote" d="M1130 270 L1218 270" />
           </g>
 
-          <!-- ===================== GITHUB-SPALTE (links) ===================== -->
+          <!-- ===================== LINKE SPALTE: CI ===================== -->
           <g class="node comp" data-component="github-ci" role="img" aria-label="GitHub CI">
             <title>GitHub Actions — CI (Build &amp; Test, GHCR-Push)</title>
-            <rect class="node-box" x="45" y="70" width="210" height="92" rx="12" />
-            <text class="node-ic" x="150" y="116" text-anchor="middle">⚙️</text>
-            <text class="node-label" x="150" y="146" text-anchor="middle">CI</text>
+            <rect class="node-box" x="40" y="60" width="260" height="100" rx="12" />
+            <text class="node-ic" x="170" y="112" text-anchor="middle">⚙️</text>
+            <text class="node-label" x="170" y="142" text-anchor="middle">CI</text>
           </g>
 
           <!-- GHCR — Image-Stapel: die letzten 3 Versionen als Karten (oben = neueste) -->
@@ -169,216 +173,230 @@
             aria-label="GHCR Image-Registry — Stapel der letzten Versionen"
           >
             <title>GitHub Container Registry — Stapel der zuletzt gebauten Images (oben = neueste)</title>
-            <rect class="ghcr-frame" x="45" y="205" width="225" height="380" rx="14" />
-            <text class="ghcr-frame-label" x="157" y="230" text-anchor="middle">GHCR — Image-Registry</text>
+            <rect class="ghcr-frame" x="40" y="200" width="260" height="300" rx="14" />
+            <text class="ghcr-frame-label" x="170" y="222" text-anchor="middle">GHCR — Image-Registry</text>
 
             <!-- Slot 0 = neueste Version (Stapel-Spitze) -->
-            <g class="ghcr-slot" transform="translate(62,248)">
+            <g class="ghcr-slot" transform="translate(54,230)">
               <g class="ghcr-card empty" id="ghcr-card-0">
-                <rect class="ghcr-card-bg" x="0" y="0" width="192" height="96" rx="10" />
-                <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
-                <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
+                <rect class="ghcr-card-bg" x="0" y="0" width="232" height="84" rx="10" />
+                <rect class="ghcr-badge-bg" x="12" y="12" width="94" height="30" rx="15" />
+                <text class="ghcr-badge-txt" x="59" y="33" text-anchor="middle">–</text>
                 <g class="ghcr-chips"></g>
                 <g class="ghcr-ribbon" aria-hidden="true">
-                  <rect class="ghcr-ribbon-bg" x="110" y="13" width="72" height="22" rx="6" />
-                  <text class="ghcr-ribbon-txt" x="146" y="28" text-anchor="middle">LATEST ✓</text>
+                  <rect class="ghcr-ribbon-bg" x="150" y="8" width="74" height="17" rx="5" />
+                  <text class="ghcr-ribbon-txt" x="187" y="20" text-anchor="middle">LATEST ✓</text>
                 </g>
                 <g class="ghcr-neu" aria-hidden="true">
-                  <rect class="ghcr-neu-bg" x="140" y="14" width="40" height="20" rx="10" />
-                  <text class="ghcr-neu-txt" x="160" y="28" text-anchor="middle">NEU</text>
+                  <rect class="ghcr-neu-bg" x="178" y="8" width="46" height="17" rx="8" />
+                  <text class="ghcr-neu-txt" x="201" y="20" text-anchor="middle">NEU</text>
                 </g>
               </g>
             </g>
-            <g class="ghcr-slot" transform="translate(62,352)">
+            <g class="ghcr-slot" transform="translate(54,320)">
               <g class="ghcr-card empty" id="ghcr-card-1">
-                <rect class="ghcr-card-bg" x="0" y="0" width="192" height="96" rx="10" />
-                <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
-                <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
+                <rect class="ghcr-card-bg" x="0" y="0" width="232" height="84" rx="10" />
+                <rect class="ghcr-badge-bg" x="12" y="12" width="94" height="30" rx="15" />
+                <text class="ghcr-badge-txt" x="59" y="33" text-anchor="middle">–</text>
                 <g class="ghcr-chips"></g>
                 <g class="ghcr-ribbon" aria-hidden="true">
-                  <rect class="ghcr-ribbon-bg" x="110" y="13" width="72" height="22" rx="6" />
-                  <text class="ghcr-ribbon-txt" x="146" y="28" text-anchor="middle">LATEST ✓</text>
+                  <rect class="ghcr-ribbon-bg" x="150" y="8" width="74" height="17" rx="5" />
+                  <text class="ghcr-ribbon-txt" x="187" y="20" text-anchor="middle">LATEST ✓</text>
                 </g>
                 <g class="ghcr-neu" aria-hidden="true">
-                  <rect class="ghcr-neu-bg" x="140" y="14" width="40" height="20" rx="10" />
-                  <text class="ghcr-neu-txt" x="160" y="28" text-anchor="middle">NEU</text>
+                  <rect class="ghcr-neu-bg" x="178" y="8" width="46" height="17" rx="8" />
+                  <text class="ghcr-neu-txt" x="201" y="20" text-anchor="middle">NEU</text>
                 </g>
               </g>
             </g>
-            <g class="ghcr-slot" transform="translate(62,456)">
+            <g class="ghcr-slot" transform="translate(54,410)">
               <g class="ghcr-card empty" id="ghcr-card-2">
-                <rect class="ghcr-card-bg" x="0" y="0" width="192" height="96" rx="10" />
-                <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
-                <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
+                <rect class="ghcr-card-bg" x="0" y="0" width="232" height="84" rx="10" />
+                <rect class="ghcr-badge-bg" x="12" y="12" width="94" height="30" rx="15" />
+                <text class="ghcr-badge-txt" x="59" y="33" text-anchor="middle">–</text>
                 <g class="ghcr-chips"></g>
                 <g class="ghcr-ribbon" aria-hidden="true">
-                  <rect class="ghcr-ribbon-bg" x="110" y="13" width="72" height="22" rx="6" />
-                  <text class="ghcr-ribbon-txt" x="146" y="28" text-anchor="middle">LATEST ✓</text>
+                  <rect class="ghcr-ribbon-bg" x="150" y="8" width="74" height="17" rx="5" />
+                  <text class="ghcr-ribbon-txt" x="187" y="20" text-anchor="middle">LATEST ✓</text>
                 </g>
                 <g class="ghcr-neu" aria-hidden="true">
-                  <rect class="ghcr-neu-bg" x="140" y="14" width="40" height="20" rx="10" />
-                  <text class="ghcr-neu-txt" x="160" y="28" text-anchor="middle">NEU</text>
+                  <rect class="ghcr-neu-bg" x="178" y="8" width="46" height="17" rx="8" />
+                  <text class="ghcr-neu-txt" x="201" y="20" text-anchor="middle">NEU</text>
                 </g>
               </g>
             </g>
 
             <!-- Geister-Karte: während CI baut, sitzt die kommende Version als
                  gestrichelte, pulsierende Zusatzkarte über Slot 0 (per app.js ein-/ausgeblendet) -->
-            <g class="ghcr-ghost" id="ghcr-ghost" transform="translate(62,248)" aria-hidden="true">
-              <rect class="ghcr-ghost-bg" x="0" y="0" width="192" height="96" rx="10" />
-              <text class="ghcr-ghost-txt" x="96" y="52" text-anchor="middle">v– · wird gebaut…</text>
+            <g class="ghcr-ghost" id="ghcr-ghost" transform="translate(54,230)" aria-hidden="true">
+              <rect class="ghcr-ghost-bg" x="0" y="0" width="232" height="84" rx="10" />
+              <text class="ghcr-ghost-txt" x="116" y="47" text-anchor="middle">v– · wird gebaut…</text>
             </g>
           </g>
 
-          <!-- ===================== TESTS & SICHERUNGEN (Mitte) ===================== -->
-          <!-- Playwright oben (spiegelt CI links); darunter der Backup-Dump-Stapel (spiegelt GHCR) -->
+          <!-- Playwright unten links (auf Höhe der Backup-Bank — Balance unten) -->
           <g class="node comp" data-component="playwright" role="img" aria-label="Playwright">
             <title>Playwright — E2E-Tests als Quality Gate</title>
-            <rect class="node-box" x="300" y="70" width="210" height="92" rx="12" />
-            <text class="node-ic" x="405" y="116" text-anchor="middle">🎭</text>
-            <text class="node-label" x="405" y="146" text-anchor="middle">Playwright</text>
-          </g>
-
-          <!-- Backup — Dump-Stapel: die letzten 3 pg_dump-Sicherungen als Karten (oben = neueste) -->
-          <g
-            class="node comp backup-stack"
-            data-component="backup-store"
-            role="img"
-            aria-label="Backup-Speicher — Stapel der letzten pg_dump-Sicherungen"
-          >
-            <title>Backup-Speicher — Stapel der letzten pg_dump-Sicherungen (oben = neueste)</title>
-            <rect class="backup-frame" x="300" y="205" width="225" height="380" rx="14" />
-            <text class="backup-frame-label" x="412" y="230" text-anchor="middle">Backups — pg_dump</text>
-
-            <!-- Slot 0 = neueste Sicherung (Stapel-Spitze) -->
-            <g class="backup-slot" transform="translate(317,248)">
-              <g class="backup-card empty" id="backup-card-0">
-                <rect class="backup-card-bg" x="0" y="0" width="192" height="96" rx="10" />
-                <g class="backup-chip">
-                  <rect class="backup-chip-bg" x="14" y="14" width="52" height="26" rx="13" />
-                  <text class="backup-chip-txt" x="40" y="32" text-anchor="middle"></text>
-                </g>
-                <text class="backup-time" x="16" y="76"></text>
-                <text class="backup-size" x="176" y="76" text-anchor="end"></text>
-              </g>
-            </g>
-            <g class="backup-slot" transform="translate(317,352)">
-              <g class="backup-card empty" id="backup-card-1">
-                <rect class="backup-card-bg" x="0" y="0" width="192" height="96" rx="10" />
-                <g class="backup-chip">
-                  <rect class="backup-chip-bg" x="14" y="14" width="52" height="26" rx="13" />
-                  <text class="backup-chip-txt" x="40" y="32" text-anchor="middle"></text>
-                </g>
-                <text class="backup-time" x="16" y="76"></text>
-                <text class="backup-size" x="176" y="76" text-anchor="end"></text>
-              </g>
-            </g>
-            <g class="backup-slot" transform="translate(317,456)">
-              <g class="backup-card empty" id="backup-card-2">
-                <rect class="backup-card-bg" x="0" y="0" width="192" height="96" rx="10" />
-                <g class="backup-chip">
-                  <rect class="backup-chip-bg" x="14" y="14" width="52" height="26" rx="13" />
-                  <text class="backup-chip-txt" x="40" y="32" text-anchor="middle"></text>
-                </g>
-                <text class="backup-time" x="16" y="76"></text>
-                <text class="backup-size" x="176" y="76" text-anchor="end"></text>
-              </g>
-            </g>
+            <rect class="node-box" x="40" y="600" width="260" height="100" rx="12" />
+            <text class="node-ic" x="170" y="652" text-anchor="middle">🎭</text>
+            <text class="node-label" x="170" y="682" text-anchor="middle">Playwright</text>
           </g>
 
           <!-- ===================== UMGEBUNG: INT ===================== -->
-          <g class="env-box" data-env="int" transform="translate(585,190)" tabindex="0" role="button" aria-label="Umgebung INT — Details anzeigen">
-            <rect class="env-alarm-frame" x="-6" y="-6" width="297" height="472" rx="18" />
-            <rect class="env-bg" x="0" y="0" width="285" height="460" rx="14" />
-            <line class="env-divider" x1="0" y1="50" x2="285" y2="50" />
-            <text class="env-name" x="18" y="33">INT</text>
+          <g class="env-box" data-env="int" transform="translate(360,80)" tabindex="0" role="button" aria-label="Umgebung INT — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="352" height="392" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="340" height="380" rx="14" />
+            <line class="env-divider" x1="0" y1="48" x2="340" y2="48" />
+            <text class="env-name" x="18" y="32">INT</text>
             <g class="env-version">
-              <rect x="120" y="14" width="100" height="28" rx="14" />
-              <text x="170" y="33" text-anchor="middle">–</text>
+              <rect x="138" y="12" width="112" height="28" rx="14" />
+              <text x="194" y="31" text-anchor="middle">–</text>
             </g>
-            <circle class="env-health health-dot" cx="258" cy="28" r="9" />
+            <circle class="env-health health-dot" cx="316" cy="26" r="9" />
 
             <g class="node comp" data-component="int-frontend">
               <title>Frontend (nginx) — ausgelieferte Web-App</title>
-              <rect class="node-box" x="22" y="68" width="241" height="86" rx="10" />
-              <text class="node-ic sm" x="60" y="120" text-anchor="middle">🖥️</text>
-              <text class="node-label" x="160" y="118" text-anchor="middle">Frontend</text>
+              <rect class="node-box" x="24" y="62" width="292" height="76" rx="10" />
+              <text class="node-ic sm" x="70" y="112" text-anchor="middle">🖥️</text>
+              <text class="node-label" x="188" y="108" text-anchor="middle">Frontend</text>
             </g>
             <g class="node comp" data-component="int-backend">
               <title>Backend (Node/Express) — API</title>
-              <rect class="node-box" x="22" y="166" width="241" height="86" rx="10" />
-              <text class="node-ic sm" x="60" y="218" text-anchor="middle">⚙️</text>
-              <text class="node-label" x="160" y="216" text-anchor="middle">Backend</text>
+              <rect class="node-box" x="24" y="150" width="292" height="76" rx="10" />
+              <text class="node-ic sm" x="70" y="200" text-anchor="middle">⚙️</text>
+              <text class="node-label" x="188" y="196" text-anchor="middle">Backend</text>
             </g>
             <g class="node comp" data-component="int-db">
               <title>PostgreSQL-Datenbank</title>
-              <path class="cyl-body" d="M64 290 L64 410 A78 13 0 0 0 220 410 L220 290" />
-              <ellipse class="cyl-top" cx="142" cy="290" rx="78" ry="13" />
-              <text class="node-label" x="142" y="360" text-anchor="middle">DB</text>
+              <path class="cyl-body" d="M90 252 L90 344 A80 13 0 0 0 250 344 L250 252" />
+              <ellipse class="cyl-top" cx="170" cy="252" rx="80" ry="13" />
+              <text class="node-label" x="170" y="305" text-anchor="middle">DB</text>
             </g>
           </g>
 
           <!-- ===================== UMGEBUNG: ABNAHME ===================== -->
-          <g class="env-box" data-env="abnahme" transform="translate(938,190)" tabindex="0" role="button" aria-label="Umgebung Abnahme — Details anzeigen">
-            <rect class="env-alarm-frame" x="-6" y="-6" width="297" height="472" rx="18" />
-            <rect class="env-bg" x="0" y="0" width="285" height="460" rx="14" />
-            <line class="env-divider" x1="0" y1="50" x2="285" y2="50" />
-            <text class="env-name" x="18" y="33">ABNAHME</text>
+          <g class="env-box" data-env="abnahme" transform="translate(790,80)" tabindex="0" role="button" aria-label="Umgebung Abnahme — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="352" height="392" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="340" height="380" rx="14" />
+            <line class="env-divider" x1="0" y1="48" x2="340" y2="48" />
+            <text class="env-name" x="18" y="32">ABNAHME</text>
             <g class="env-version">
-              <rect x="120" y="14" width="100" height="28" rx="14" />
-              <text x="170" y="33" text-anchor="middle">–</text>
+              <rect x="138" y="12" width="112" height="28" rx="14" />
+              <text x="194" y="31" text-anchor="middle">–</text>
             </g>
-            <circle class="env-health health-dot" cx="258" cy="28" r="9" />
+            <circle class="env-health health-dot" cx="316" cy="26" r="9" />
 
             <g class="node comp" data-component="abnahme-frontend">
               <title>Frontend (nginx) — ausgelieferte Web-App</title>
-              <rect class="node-box" x="22" y="68" width="241" height="86" rx="10" />
-              <text class="node-ic sm" x="60" y="120" text-anchor="middle">🖥️</text>
-              <text class="node-label" x="160" y="118" text-anchor="middle">Frontend</text>
+              <rect class="node-box" x="24" y="62" width="292" height="76" rx="10" />
+              <text class="node-ic sm" x="70" y="112" text-anchor="middle">🖥️</text>
+              <text class="node-label" x="188" y="108" text-anchor="middle">Frontend</text>
             </g>
             <g class="node comp" data-component="abnahme-backend">
               <title>Backend (Node/Express) — API</title>
-              <rect class="node-box" x="22" y="166" width="241" height="86" rx="10" />
-              <text class="node-ic sm" x="60" y="218" text-anchor="middle">⚙️</text>
-              <text class="node-label" x="160" y="216" text-anchor="middle">Backend</text>
+              <rect class="node-box" x="24" y="150" width="292" height="76" rx="10" />
+              <text class="node-ic sm" x="70" y="200" text-anchor="middle">⚙️</text>
+              <text class="node-label" x="188" y="196" text-anchor="middle">Backend</text>
             </g>
             <g class="node comp" data-component="abnahme-db">
               <title>PostgreSQL-Datenbank</title>
-              <path class="cyl-body" d="M64 290 L64 410 A78 13 0 0 0 220 410 L220 290" />
-              <ellipse class="cyl-top" cx="142" cy="290" rx="78" ry="13" />
-              <text class="node-label" x="142" y="360" text-anchor="middle">DB</text>
+              <path class="cyl-body" d="M90 252 L90 344 A80 13 0 0 0 250 344 L250 252" />
+              <ellipse class="cyl-top" cx="170" cy="252" rx="80" ry="13" />
+              <text class="node-label" x="170" y="305" text-anchor="middle">DB</text>
             </g>
           </g>
 
           <!-- ===================== UMGEBUNG: PROD ===================== -->
-          <g class="env-box" data-env="prod" transform="translate(1291,190)" tabindex="0" role="button" aria-label="Umgebung PROD — Details anzeigen">
-            <rect class="env-alarm-frame" x="-6" y="-6" width="297" height="472" rx="18" />
-            <rect class="env-bg" x="0" y="0" width="285" height="460" rx="14" />
-            <line class="env-divider" x1="0" y1="50" x2="285" y2="50" />
-            <text class="env-name" x="18" y="33">PROD</text>
+          <g class="env-box" data-env="prod" transform="translate(1220,80)" tabindex="0" role="button" aria-label="Umgebung PROD — Details anzeigen">
+            <rect class="env-alarm-frame" x="-6" y="-6" width="352" height="392" rx="18" />
+            <rect class="env-bg" x="0" y="0" width="340" height="380" rx="14" />
+            <line class="env-divider" x1="0" y1="48" x2="340" y2="48" />
+            <text class="env-name" x="18" y="32">PROD</text>
             <g class="env-version">
-              <rect x="120" y="14" width="100" height="28" rx="14" />
-              <text x="170" y="33" text-anchor="middle">–</text>
+              <rect x="138" y="12" width="112" height="28" rx="14" />
+              <text x="194" y="31" text-anchor="middle">–</text>
             </g>
-            <circle class="env-health health-dot" cx="258" cy="28" r="9" />
+            <circle class="env-health health-dot" cx="316" cy="26" r="9" />
 
             <g class="node comp" data-component="prod-frontend">
               <title>Frontend (nginx) — ausgelieferte Web-App</title>
-              <rect class="node-box" x="22" y="68" width="241" height="86" rx="10" />
-              <text class="node-ic sm" x="60" y="120" text-anchor="middle">🖥️</text>
-              <text class="node-label" x="160" y="118" text-anchor="middle">Frontend</text>
+              <rect class="node-box" x="24" y="62" width="292" height="76" rx="10" />
+              <text class="node-ic sm" x="70" y="112" text-anchor="middle">🖥️</text>
+              <text class="node-label" x="188" y="108" text-anchor="middle">Frontend</text>
             </g>
             <g class="node comp" data-component="prod-backend">
               <title>Backend (Node/Express) — API</title>
-              <rect class="node-box" x="22" y="166" width="241" height="86" rx="10" />
-              <text class="node-ic sm" x="60" y="218" text-anchor="middle">⚙️</text>
-              <text class="node-label" x="160" y="216" text-anchor="middle">Backend</text>
+              <rect class="node-box" x="24" y="150" width="292" height="76" rx="10" />
+              <text class="node-ic sm" x="70" y="200" text-anchor="middle">⚙️</text>
+              <text class="node-label" x="188" y="196" text-anchor="middle">Backend</text>
             </g>
             <g class="node comp" data-component="prod-db">
               <title>PostgreSQL-Datenbank</title>
-              <path class="cyl-body" d="M64 290 L64 410 A78 13 0 0 0 220 410 L220 290" />
-              <ellipse class="cyl-top" cx="142" cy="290" rx="78" ry="13" />
-              <text class="node-label" x="142" y="360" text-anchor="middle">DB</text>
+              <path class="cyl-body" d="M90 252 L90 344 A80 13 0 0 0 250 344 L250 252" />
+              <ellipse class="cyl-top" cx="170" cy="252" rx="80" ry="13" />
+              <text class="node-label" x="170" y="305" text-anchor="middle">DB</text>
+            </g>
+          </g>
+
+          <!-- ===================== BACKUP-BANK (unter den Umgebungen) ===================== -->
+          <!-- Je Umgebung ein Dump-Stapel, mittig unter seiner Env-Box (Mittelachse gleich). -->
+          <g class="node comp backup-bank" data-component="backup-int" transform="translate(430,620)" role="img" aria-label="Sicherung INT — letzter pg_dump">
+            <title>Sicherung INT — neuester pg_dump (Host-Mount /backups)</title>
+            <text class="backup-title" x="100" y="14" text-anchor="middle">Backup · INT</text>
+            <rect class="backup-shadow s2" x="26" y="28" width="132" height="88" rx="9" />
+            <rect class="backup-shadow s1" x="30" y="31" width="132" height="88" rx="9" />
+            <g class="backup-card">
+              <rect class="backup-top-bg" x="34" y="34" width="132" height="88" rx="9" />
+              <text class="backup-time" x="100" y="76" text-anchor="middle">—</text>
+              <text class="backup-size" x="100" y="102" text-anchor="middle">— kB</text>
+            </g>
+            <g class="backup-count" aria-hidden="true">
+              <rect class="backup-count-bg" x="132" y="20" width="44" height="20" rx="10" />
+              <text class="backup-count-txt" x="154" y="34" text-anchor="middle">×0</text>
+            </g>
+            <g class="backup-placeholder" aria-hidden="true">
+              <rect class="backup-ph-bg" x="34" y="34" width="132" height="88" rx="9" />
+              <text class="backup-ph-txt" x="100" y="84" text-anchor="middle">kein Backup</text>
+            </g>
+          </g>
+
+          <g class="node comp backup-bank" data-component="backup-abnahme" transform="translate(860,620)" role="img" aria-label="Sicherung Abnahme — letzter pg_dump">
+            <title>Sicherung Abnahme — neuester pg_dump (Host-Mount /backups)</title>
+            <text class="backup-title" x="100" y="14" text-anchor="middle">Backup · ABN</text>
+            <rect class="backup-shadow s2" x="26" y="28" width="132" height="88" rx="9" />
+            <rect class="backup-shadow s1" x="30" y="31" width="132" height="88" rx="9" />
+            <g class="backup-card">
+              <rect class="backup-top-bg" x="34" y="34" width="132" height="88" rx="9" />
+              <text class="backup-time" x="100" y="76" text-anchor="middle">—</text>
+              <text class="backup-size" x="100" y="102" text-anchor="middle">— kB</text>
+            </g>
+            <g class="backup-count" aria-hidden="true">
+              <rect class="backup-count-bg" x="132" y="20" width="44" height="20" rx="10" />
+              <text class="backup-count-txt" x="154" y="34" text-anchor="middle">×0</text>
+            </g>
+            <g class="backup-placeholder" aria-hidden="true">
+              <rect class="backup-ph-bg" x="34" y="34" width="132" height="88" rx="9" />
+              <text class="backup-ph-txt" x="100" y="84" text-anchor="middle">kein Backup</text>
+            </g>
+          </g>
+
+          <g class="node comp backup-bank" data-component="backup-prod" transform="translate(1290,620)" role="img" aria-label="Sicherung PROD — letzter pg_dump">
+            <title>Sicherung PROD — neuester pg_dump (Host-Mount /backups)</title>
+            <text class="backup-title" x="100" y="14" text-anchor="middle">Backup · PROD</text>
+            <rect class="backup-shadow s2" x="26" y="28" width="132" height="88" rx="9" />
+            <rect class="backup-shadow s1" x="30" y="31" width="132" height="88" rx="9" />
+            <g class="backup-card">
+              <rect class="backup-top-bg" x="34" y="34" width="132" height="88" rx="9" />
+              <text class="backup-time" x="100" y="76" text-anchor="middle">—</text>
+              <text class="backup-size" x="100" y="102" text-anchor="middle">— kB</text>
+            </g>
+            <g class="backup-count" aria-hidden="true">
+              <rect class="backup-count-bg" x="132" y="20" width="44" height="20" rx="10" />
+              <text class="backup-count-txt" x="154" y="34" text-anchor="middle">×0</text>
+            </g>
+            <g class="backup-placeholder" aria-hidden="true">
+              <rect class="backup-ph-bg" x="34" y="34" width="132" height="88" rx="9" />
+              <text class="backup-ph-txt" x="100" y="84" text-anchor="middle">kein Backup</text>
             </g>
           </g>
 
@@ -386,13 +404,13 @@
           <g class="approval-layer">
             <g class="approval-node" id="approval-int-abnahme">
               <title>Freigabe INT → Abnahme</title>
-              <circle class="approval-ring" cx="904" cy="420" r="19" />
-              <text class="approval-ic" x="904" y="427" text-anchor="middle">⏸</text>
+              <circle class="approval-ring" cx="745" cy="270" r="19" />
+              <text class="approval-ic" x="745" y="277" text-anchor="middle">⏸</text>
             </g>
             <g class="approval-node" id="approval-abnahme-prod">
               <title>Freigabe Abnahme → PROD</title>
-              <circle class="approval-ring" cx="1257" cy="420" r="19" />
-              <text class="approval-ic" x="1257" y="427" text-anchor="middle">⏸</text>
+              <circle class="approval-ring" cx="1175" cy="270" r="19" />
+              <text class="approval-ic" x="1175" y="277" text-anchor="middle">⏸</text>
             </g>
           </g>
 
