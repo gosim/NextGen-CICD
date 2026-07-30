@@ -94,6 +94,10 @@ services:
       # Fine-grained PAT aus ~/deployments/mission-control.env — stacks.sh
       # exportiert MC_GITHUB_TOKEN vor dem Compose-Aufruf (nie im Repo!).
       GITHUB_TOKEN: ${MC_GITHUB_TOKEN:-}
+    volumes:
+      # Read-only-Blick auf die echten pg_dump-Backups des Hosts — der
+      # Dump-Stapel in der Visualisierung zeigt reale Dateien (Env/Zeit/Größe).
+      - ${HOME}/deployments/backups:/backups:ro
     depends_on:
       ops-db:
         condition: service_healthy

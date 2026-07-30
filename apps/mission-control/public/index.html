@@ -113,7 +113,7 @@
 
           <!-- Spaltenbeschriftungen -->
           <text class="col-label" x="157" y="30" text-anchor="middle">GitHub</text>
-          <text class="col-label" x="405" y="30" text-anchor="middle">Ausführung (Mac)</text>
+          <text class="col-label" x="410" y="30" text-anchor="middle">Tests &amp; Sicherungen</text>
           <text class="col-label" x="1080" y="30" text-anchor="middle">Umgebungen — Promotionskette</text>
 
           <!-- Kettenpfeile der Promotionskette (unterste Ebene, unter den Flüssen) -->
@@ -129,23 +129,23 @@
 
             <!-- INT -->
             <path id="flow-int-pull" class="flow-path" d="M256 385 C420 340 480 300 585 300" />
-            <path id="flow-int-test" class="flow-path" d="M480 370 C540 330 560 300 585 280" />
-            <path id="flow-int-backup" class="flow-path" d="M715 580 C620 640 560 620 495 605" />
-            <path id="flow-int-restore" class="flow-path flow-restore" d="M495 595 C560 620 620 560 700 545" />
+            <path id="flow-int-test" class="flow-path" d="M508 125 C548 180 560 250 585 300" />
+            <path id="flow-int-backup" class="flow-path" d="M672 545 C600 500 545 400 512 322" />
+            <path id="flow-int-restore" class="flow-path flow-restore" d="M512 330 C560 420 600 480 672 540" />
             <path id="flow-int-rollback-pull" class="flow-path flow-restore" d="M256 278 C420 210 470 230 585 250" />
 
             <!-- ABNAHME -->
             <path id="flow-abnahme-pull" class="flow-path" d="M256 395 C520 470 720 320 938 300" />
-            <path id="flow-abnahme-test" class="flow-path" d="M485 400 C650 430 800 420 938 400" />
-            <path id="flow-abnahme-backup" class="flow-path" d="M1060 520 C820 640 640 640 495 610" />
-            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M495 600 C640 650 850 560 1060 540" />
+            <path id="flow-abnahme-test" class="flow-path" d="M508 130 C690 190 820 270 938 305" />
+            <path id="flow-abnahme-backup" class="flow-path" d="M1005 540 C760 470 620 380 512 312" />
+            <path id="flow-abnahme-restore" class="flow-path flow-restore" d="M512 320 C640 400 800 470 1005 535" />
             <path id="flow-abnahme-rollback-pull" class="flow-path flow-restore" d="M256 283 C520 360 720 250 938 260" />
 
             <!-- PROD -->
             <path id="flow-prod-pull" class="flow-path" d="M256 405 C560 540 900 360 1291 300" />
-            <path id="flow-prod-test" class="flow-path" d="M490 410 C720 500 1000 470 1291 430" />
-            <path id="flow-prod-backup" class="flow-path" d="M1413 520 C1050 680 680 660 495 615" />
-            <path id="flow-prod-restore" class="flow-path flow-restore" d="M495 605 C680 670 1050 580 1413 545" />
+            <path id="flow-prod-test" class="flow-path" d="M510 135 C770 220 1050 300 1291 325" />
+            <path id="flow-prod-backup" class="flow-path" d="M1358 540 C980 470 700 370 512 304" />
+            <path id="flow-prod-restore" class="flow-path flow-restore" d="M512 312 C720 390 1050 460 1358 535" />
             <path id="flow-prod-rollback-pull" class="flow-path flow-restore" d="M256 288 C560 440 900 320 1291 270" />
 
             <!-- Promotionskette (entlang der Kettenpfeile) -->
@@ -179,6 +179,14 @@
                 <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
                 <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
                 <g class="ghcr-chips"></g>
+                <g class="ghcr-ribbon" aria-hidden="true">
+                  <rect class="ghcr-ribbon-bg" x="110" y="13" width="72" height="22" rx="6" />
+                  <text class="ghcr-ribbon-txt" x="146" y="28" text-anchor="middle">LATEST ✓</text>
+                </g>
+                <g class="ghcr-neu" aria-hidden="true">
+                  <rect class="ghcr-neu-bg" x="140" y="14" width="40" height="20" rx="10" />
+                  <text class="ghcr-neu-txt" x="160" y="28" text-anchor="middle">NEU</text>
+                </g>
               </g>
             </g>
             <g class="ghcr-slot" transform="translate(62,352)">
@@ -187,6 +195,14 @@
                 <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
                 <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
                 <g class="ghcr-chips"></g>
+                <g class="ghcr-ribbon" aria-hidden="true">
+                  <rect class="ghcr-ribbon-bg" x="110" y="13" width="72" height="22" rx="6" />
+                  <text class="ghcr-ribbon-txt" x="146" y="28" text-anchor="middle">LATEST ✓</text>
+                </g>
+                <g class="ghcr-neu" aria-hidden="true">
+                  <rect class="ghcr-neu-bg" x="140" y="14" width="40" height="20" rx="10" />
+                  <text class="ghcr-neu-txt" x="160" y="28" text-anchor="middle">NEU</text>
+                </g>
               </g>
             </g>
             <g class="ghcr-slot" transform="translate(62,456)">
@@ -195,30 +211,79 @@
                 <rect class="ghcr-badge-bg" x="14" y="16" width="96" height="30" rx="15" />
                 <text class="ghcr-badge-txt" x="62" y="37" text-anchor="middle">–</text>
                 <g class="ghcr-chips"></g>
+                <g class="ghcr-ribbon" aria-hidden="true">
+                  <rect class="ghcr-ribbon-bg" x="110" y="13" width="72" height="22" rx="6" />
+                  <text class="ghcr-ribbon-txt" x="146" y="28" text-anchor="middle">LATEST ✓</text>
+                </g>
+                <g class="ghcr-neu" aria-hidden="true">
+                  <rect class="ghcr-neu-bg" x="140" y="14" width="40" height="20" rx="10" />
+                  <text class="ghcr-neu-txt" x="160" y="28" text-anchor="middle">NEU</text>
+                </g>
               </g>
+            </g>
+
+            <!-- Geister-Karte: während CI baut, sitzt die kommende Version als
+                 gestrichelte, pulsierende Zusatzkarte über Slot 0 (per app.js ein-/ausgeblendet) -->
+            <g class="ghcr-ghost" id="ghcr-ghost" transform="translate(62,248)" aria-hidden="true">
+              <rect class="ghcr-ghost-bg" x="0" y="0" width="192" height="96" rx="10" />
+              <text class="ghcr-ghost-txt" x="96" y="52" text-anchor="middle">v– · wird gebaut…</text>
             </g>
           </g>
 
-          <!-- ===================== AUSFÜHRUNG (schmale Mitte) ===================== -->
-          <g class="node comp" data-component="runner" role="img" aria-label="Self-hosted Runner">
-            <title>Self-hosted Runner (Mac) — führt Deploy, Gate &amp; Rollback aus</title>
-            <rect class="node-box" x="300" y="95" width="210" height="90" rx="12" />
-            <text class="node-ic" x="405" y="140" text-anchor="middle">🖥️</text>
-            <text class="node-label" x="405" y="170" text-anchor="middle">Runner (Mac)</text>
-          </g>
+          <!-- ===================== TESTS & SICHERUNGEN (Mitte) ===================== -->
+          <!-- Playwright oben (spiegelt CI links); darunter der Backup-Dump-Stapel (spiegelt GHCR) -->
           <g class="node comp" data-component="playwright" role="img" aria-label="Playwright">
             <title>Playwright — E2E-Tests als Quality Gate</title>
-            <rect class="node-box" x="300" y="340" width="210" height="100" rx="12" />
-            <text class="node-ic" x="405" y="388" text-anchor="middle">🎭</text>
-            <text class="node-label" x="405" y="418" text-anchor="middle">Playwright</text>
+            <rect class="node-box" x="300" y="70" width="210" height="92" rx="12" />
+            <text class="node-ic" x="405" y="116" text-anchor="middle">🎭</text>
+            <text class="node-label" x="405" y="146" text-anchor="middle">Playwright</text>
           </g>
-          <g class="node comp" data-component="backup-store" role="img" aria-label="Backup-Speicher">
-            <title>Backup-Speicher — pg_dump-Sicherungen für den Rollback</title>
-            <path class="cyl-body" d="M315 560 L315 655 A90 13 0 0 0 495 655 L495 560" />
-            <ellipse class="cyl-line" cx="405" cy="595" rx="90" ry="13" />
-            <ellipse class="cyl-line" cx="405" cy="628" rx="90" ry="13" />
-            <ellipse class="cyl-top" cx="405" cy="560" rx="90" ry="13" />
-            <text class="node-label" x="405" y="650" text-anchor="middle">Backups</text>
+
+          <!-- Backup — Dump-Stapel: die letzten 3 pg_dump-Sicherungen als Karten (oben = neueste) -->
+          <g
+            class="node comp backup-stack"
+            data-component="backup-store"
+            role="img"
+            aria-label="Backup-Speicher — Stapel der letzten pg_dump-Sicherungen"
+          >
+            <title>Backup-Speicher — Stapel der letzten pg_dump-Sicherungen (oben = neueste)</title>
+            <rect class="backup-frame" x="300" y="205" width="225" height="380" rx="14" />
+            <text class="backup-frame-label" x="412" y="230" text-anchor="middle">Backups — pg_dump</text>
+
+            <!-- Slot 0 = neueste Sicherung (Stapel-Spitze) -->
+            <g class="backup-slot" transform="translate(317,248)">
+              <g class="backup-card empty" id="backup-card-0">
+                <rect class="backup-card-bg" x="0" y="0" width="192" height="96" rx="10" />
+                <g class="backup-chip">
+                  <rect class="backup-chip-bg" x="14" y="14" width="52" height="26" rx="13" />
+                  <text class="backup-chip-txt" x="40" y="32" text-anchor="middle"></text>
+                </g>
+                <text class="backup-time" x="16" y="76"></text>
+                <text class="backup-size" x="176" y="76" text-anchor="end"></text>
+              </g>
+            </g>
+            <g class="backup-slot" transform="translate(317,352)">
+              <g class="backup-card empty" id="backup-card-1">
+                <rect class="backup-card-bg" x="0" y="0" width="192" height="96" rx="10" />
+                <g class="backup-chip">
+                  <rect class="backup-chip-bg" x="14" y="14" width="52" height="26" rx="13" />
+                  <text class="backup-chip-txt" x="40" y="32" text-anchor="middle"></text>
+                </g>
+                <text class="backup-time" x="16" y="76"></text>
+                <text class="backup-size" x="176" y="76" text-anchor="end"></text>
+              </g>
+            </g>
+            <g class="backup-slot" transform="translate(317,456)">
+              <g class="backup-card empty" id="backup-card-2">
+                <rect class="backup-card-bg" x="0" y="0" width="192" height="96" rx="10" />
+                <g class="backup-chip">
+                  <rect class="backup-chip-bg" x="14" y="14" width="52" height="26" rx="13" />
+                  <text class="backup-chip-txt" x="40" y="32" text-anchor="middle"></text>
+                </g>
+                <text class="backup-time" x="16" y="76"></text>
+                <text class="backup-size" x="176" y="76" text-anchor="end"></text>
+              </g>
+            </g>
           </g>
 
           <!-- ===================== UMGEBUNG: INT ===================== -->

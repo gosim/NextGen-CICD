@@ -874,6 +874,175 @@ body {
   animation: ghcr-card-shift 0.5s ease both;
 }
 
+/* „LATEST ✓"-Band auf der neuesten promoteten Karte (Blau-Akzent — Grün bleibt Status) */
+.ghcr-ribbon {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.ghcr-card.is-latest .ghcr-ribbon {
+  opacity: 1;
+}
+.ghcr-ribbon-bg {
+  fill: #5794f2;
+  filter: drop-shadow(0 0 5px rgba(87, 148, 242, 0.6));
+}
+.ghcr-ribbon-txt {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+/* „NEU" dezent auf noch nicht promoteten Karten */
+.ghcr-neu {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.ghcr-card.is-neu .ghcr-neu {
+  opacity: 1;
+}
+.ghcr-neu-bg {
+  fill: rgba(138, 184, 255, 0.1);
+  stroke: rgba(138, 184, 255, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.ghcr-neu-txt {
+  fill: #9fb6da;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+/* Leere Slots tragen weder Band noch Label */
+.ghcr-card.empty .ghcr-ribbon,
+.ghcr-card.empty .ghcr-neu {
+  display: none;
+}
+
+/* Geister-Karte: gestrichelte, pulsierende Zusatzkarte über der Stapel-Spitze,
+   solange CI eine noch nicht registrierte Version baut */
+.ghcr-ghost {
+  display: none;
+}
+.ghcr-ghost.visible {
+  display: block;
+}
+.ghcr-ghost-bg {
+  fill: rgba(14, 21, 38, 0.9);
+  stroke: #5794f2;
+  stroke-width: 1.8;
+  stroke-dasharray: 7 5;
+  animation: ghost-pulse 1.4s ease-in-out infinite;
+}
+.ghcr-ghost-txt {
+  fill: #9fc0ff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+/* ==================== Backup — Dump-Stapel ==================== */
+.backup-frame {
+  fill: rgba(16, 24, 42, 0.55);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+.backup-frame-label {
+  fill: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+/* Aktiver Stapel: nur der Rahmen glüht, kein Skalieren des gesamten Blocks */
+.backup-stack.comp.active {
+  animation: none;
+}
+.backup-stack.comp.active .backup-frame {
+  stroke: #6ea0ff;
+  stroke-width: 2.5;
+}
+
+.backup-card {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.backup-card-bg {
+  fill: var(--panel);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+.backup-card.empty .backup-card-bg {
+  fill: transparent;
+  stroke: var(--border-soft);
+  stroke-dasharray: 6 5;
+  opacity: 0.5;
+}
+.backup-card.empty .backup-chip,
+.backup-card.empty .backup-time,
+.backup-card.empty .backup-size {
+  display: none;
+}
+
+/* Env-Chip — dezente Tönung je Umgebung (nur Blau/Violett, §7) */
+.backup-chip-bg {
+  fill: rgba(138, 184, 255, 0.12);
+  stroke: rgba(138, 184, 255, 0.5);
+  stroke-width: 1;
+}
+.backup-chip-txt {
+  fill: #cfe0ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+.backup-chip.chip-int .backup-chip-bg {
+  fill: rgba(87, 148, 242, 0.16);
+  stroke: rgba(87, 148, 242, 0.6);
+}
+.backup-chip.chip-int .backup-chip-txt {
+  fill: #bcd4ff;
+}
+.backup-chip.chip-abnahme .backup-chip-bg {
+  fill: rgba(163, 82, 204, 0.16);
+  stroke: rgba(163, 82, 204, 0.6);
+}
+.backup-chip.chip-abnahme .backup-chip-txt {
+  fill: #e4c4f4;
+}
+.backup-chip.chip-prod .backup-chip-bg {
+  fill: rgba(124, 46, 163, 0.2);
+  stroke: rgba(124, 46, 163, 0.65);
+}
+.backup-chip.chip-prod .backup-chip-txt {
+  fill: #d8bff0;
+}
+
+.backup-time {
+  fill: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums;
+}
+.backup-size {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* Stapel-Spitze glüht rot während einer Wiederherstellung (§3) */
+.backup-card.glow .backup-card-bg {
+  stroke: #ff8a97;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 8px rgba(239, 71, 87, 0.8));
+}
+/* Neue Karte gleitet ein, übrige rücken nach (Muster vom GHCR-Stapel) */
+.backup-card.card-enter {
+  animation: ghcr-card-enter 0.5s ease both;
+}
+.backup-card.card-shift {
+  animation: ghcr-card-shift 0.5s ease both;
+}
+
 /* ==================== Promotionskette (Kettenpfeile + Freigaben) ==================== */
 .chain-arrow {
   fill: none;
@@ -1244,6 +1413,16 @@ body {
     transform: translateY(0);
   }
 }
+/* Puls der Geister-Karte (wird gebaut …) */
+@keyframes ghost-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 /* ⏸-Puls auf den Kettenpfeilen */
 @keyframes approval-pulse {
   0%,
@@ -1272,6 +1451,11 @@ body {
   .tc-spin,
   .tcx-spin {
     border-top-color: transparent;
+  }
+  /* Geister-Karte bleibt sichtbar, nur der Puls entfällt */
+  .ghcr-ghost-bg {
+    animation: none;
+    opacity: 1;
   }
 }
 

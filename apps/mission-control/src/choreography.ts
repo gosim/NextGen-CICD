@@ -13,7 +13,7 @@ import type {
 
 export interface ChoreographyInput {
   jobs: GithubJobView[];
-  tests: { active: boolean; env: EnvKey | null };
+  tests: { active: boolean; env: EnvKey | null; source: string | null };
 }
 
 type JobKind = 'ci-quality' | 'ci-build' | 'deploy' | 'gate' | 'rollback' | 'stability' | 'other';
@@ -111,11 +111,15 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
       active.add('github-ci');
       active.add('ghcr');
       flows.add('ci-build');
-    } else if ((kind === 'gate' || kind === 'stability') && env) {
+    } else if (kind === 'gate' && env) {
       lightTestPath(env, active, flows);
+    } else if (kind === 'stability') {
+      // Bewusst KEINE Karten-Effekte: Der stündliche Check ist Hintergrund-
+      // Monitoring — pulsierende Umgebungen würden die Zuschauer irritieren.
+      // Sichtbarkeit: Kompaktzeile im Testpanel + Status-Chip im Kopf.
     } else if (kind === 'rollback' && env) {
       // Rollback zieht das letzte Image von der Stapel-Spitze und die DB aus dem
-      // Backup zurück — daher ghcr (statt runner) aktiv.
+      // Backup zurück — daher ghcr aktiv.
       active.add(`${env}-db`);
       active.add('backup-store');
       active.add('ghcr');
@@ -129,14 +133,6 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
     for (const step of job.steps) {
       if (step.status !== 'in_progress') continue;
       const name = step.name;
-
-      if (
-        name.includes('Letzte grüne Version') ||
-        name.includes('GHCR-Login') ||
-        name.includes('State & Ops-Event')
-      ) {
-        active.add('runner');
-      }
 
       if (env && name.includes('Datenbank-Backup')) {
         active.add(`${env}-db`);
@@ -167,7 +163,9 @@ export function deriveChoreography(input: ChoreographyInput): ChoreographyState 
   // Live-Test-Signal des Playwright-Reporters ergänzt die Job-Erkennung (die dem
   // realen Testlauf oft nachläuft): läuft eine Suite gegen eine Umgebung, pulsiert
   // deren Testpfad unabhängig vom Job-Polling.
-  if (input.tests.active && input.tests.env) {
+  // Live-Test-Signal beleuchtet die Karte NUR beim echten Pipeline-Gate —
+  // der Stabilitäts-Check bleibt bewusst effektfrei (Hintergrund-Monitoring).
+  if (input.tests.active && input.tests.env && input.tests.source === 'gate') {
     lightTestPath(input.tests.env, active, flows);
   }
 

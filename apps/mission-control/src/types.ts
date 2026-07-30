@@ -52,8 +52,8 @@ export interface Alarm {
 
 // ── Architektur-Karte: Komponenten & Flüsse (CONTRACT §2/§3, v2) ─────────────
 
-/** Globale Komponenten der Architektur-Karte (CONTRACT §2). */
-export type GlobalComponentId = 'github-ci' | 'ghcr' | 'runner' | 'backup-store' | 'playwright';
+/** Globale Komponenten der Architektur-Karte (CONTRACT §2, v3: `runner` entfällt). */
+export type GlobalComponentId = 'github-ci' | 'ghcr' | 'backup-store' | 'playwright';
 
 /** Komponenten je Umgebung — bewusst vereinfachte Zuschauer-Sicht (CONTRACT §2). */
 export type EnvComponentId = `${EnvKey}-frontend` | `${EnvKey}-backend` | `${EnvKey}-db`;
@@ -126,6 +126,8 @@ export interface TickerItem {
 export interface RegistryImage {
   version: string;
   imageTag: string;
+  /** true = hat mind. ein Gate bestanden (Promotion). Neueste promotete = „LATEST ✓". */
+  promoted: boolean;
 }
 
 /** Der GHCR-Stapel: die letzten drei gebauten Versionen, neueste zuerst. */
@@ -133,11 +135,27 @@ export interface RegistryState {
   images: RegistryImage[];
 }
 
+/** Eine pg_dump-Datei im Dump-Stapel (CONTRACT §1 „backups"). */
+export interface BackupDump {
+  /** Umgebung aus dem Ordnernamen (`/backups/<env>/…`); null bei unbekanntem Ordner. */
+  env: EnvKey | null;
+  at: string;
+  sizeBytes: number;
+  /** Tag aus dem Dateinamen-Muster `<timestamp>_<tag>.dump`; null wenn nicht ableitbar. */
+  tag: string | null;
+}
+
+/** Der Dump-Stapel: die letzten drei pg_dump-Dateien, neueste zuerst. */
+export interface BackupsState {
+  dumps: BackupDump[];
+}
+
 export interface Snapshot {
   generatedAt: string;
   github: GithubState;
   choreography: ChoreographyState;
   registry: RegistryState;
+  backups: BackupsState;
   environments: Record<EnvKey, EnvironmentState>;
   tests: TestsState;
   ticker: TickerItem[];

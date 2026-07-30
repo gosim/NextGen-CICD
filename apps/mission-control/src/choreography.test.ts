@@ -15,7 +15,7 @@ function job(
 }
 
 function input(jobs: GithubJobView[], tests?: ChoreographyInput['tests']): ChoreographyInput {
-  return { jobs, tests: tests ?? { active: false, env: null } };
+  return { jobs, tests: tests ?? { active: false, env: null, source: null } };
 }
 
 describe('parseJobName', () => {
@@ -151,32 +151,37 @@ describe('deriveChoreography', () => {
     expect(result).toEqual({ active: [], flows: [], alarm: null });
   });
 
-  it('Stability-Check läuft: 🔍-Job aktiviert den Testpfad der Umgebung', () => {
+  it('Stability-Check läuft: 🔍-Job erzeugt bewusst KEINE Karten-Effekte', () => {
     const result = deriveChoreography(input([job('🔍 PROD', 'in_progress')]));
-    expect(result.active).toEqual(
-      expect.arrayContaining(['playwright', 'prod-frontend', 'prod-backend', 'prod-db']),
-    );
-    expect(result.flows).toContain('prod-test');
+    expect(result).toEqual({ active: [], flows: [], alarm: null });
   });
 
-  it('Live-Test-Signal ohne passenden Job aktiviert den Testpfad dennoch', () => {
-    const result = deriveChoreography(input([], { active: true, env: 'int' }));
+  it('Live-Test-Signal (source=gate) aktiviert den Testpfad auch ohne passenden Job', () => {
+    const result = deriveChoreography(input([], { active: true, env: 'int', source: 'gate' }));
     expect(result.active).toEqual(
       expect.arrayContaining(['playwright', 'int-frontend', 'int-backend', 'int-db']),
     );
     expect(result.flows).toContain('int-test');
   });
 
-  it('Runner-Steps (Letzte grüne Version / State & Ops-Event) aktivieren den Runner', () => {
+  it('Live-Test-Signal des Stabilitäts-Checks bleibt bewusst effektfrei', () => {
+    const result = deriveChoreography(input([], { active: true, env: 'int', source: 'stability' }));
+    expect(result).toEqual({ active: [], flows: [], alarm: null });
+  });
+
+  it('Verwaltungs-Steps bleiben effektfrei', () => {
+    // v3: `runner` entfällt — Verwaltungsrauschen (Letzte grüne Version /
+    // GHCR-Login / State & Ops-Event) erzeugt bewusst keine Choreografie.
     const result = deriveChoreography(
       input([
         job('INT / 🚀 Deploy', 'in_progress', [
           step('Letzte grüne Version lesen'),
-          step('State & Ops-Event aktualisieren', 'queued'),
+          step('GHCR-Login'),
+          step('State & Ops-Event aktualisieren'),
         ]),
       ]),
     );
-    expect(result.active).toContain('runner');
+    expect(result).toEqual({ active: [], flows: [], alarm: null });
   });
 
   it('dedupliziert Komponenten über mehrere Jobs/Steps hinweg', () => {

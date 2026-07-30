@@ -1,6 +1,7 @@
 import { deriveChoreography } from './choreography.js';
 import { idlePipelineStages } from './stages.js';
 import type {
+  BackupDump,
   EnvKey,
   EnvironmentState,
   GithubJobView,
@@ -47,6 +48,7 @@ function initialSnapshot(): Snapshot {
     },
     choreography: { active: [], flows: [], alarm: null },
     registry: { images: [] },
+    backups: { dumps: [] },
     environments: {
       int: emptyEnvironment(),
       abnahme: emptyEnvironment(),
@@ -131,6 +133,12 @@ export class StateStore {
   /** GHCR-Stapel setzen (vom Ops-DB-Poller): letzte 3 gebaute Versionen, neueste zuerst. */
   setRegistry(images: RegistryImage[]): void {
     this.snapshot.registry = { images };
+    this.scheduleBroadcast();
+  }
+
+  /** Dump-Stapel setzen (vom Backups-Poller): letzte 3 pg_dump-Dateien, neueste zuerst. */
+  setBackups(dumps: BackupDump[]): void {
+    this.snapshot.backups = { dumps };
     this.scheduleBroadcast();
   }
 
@@ -219,7 +227,11 @@ export class StateStore {
   private recomputeChoreography(): void {
     this.snapshot.choreography = deriveChoreography({
       jobs: this.githubJobs,
-      tests: { active: this.snapshot.tests.active, env: this.snapshot.tests.env },
+      tests: {
+        active: this.snapshot.tests.active,
+        env: this.snapshot.tests.env,
+        source: this.snapshot.tests.source,
+      },
     });
   }
 

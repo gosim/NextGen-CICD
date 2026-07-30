@@ -265,23 +265,21 @@ function renderTests(tests) {
 
   const total = tests.summary?.total ?? cases.length;
   const done = cases.filter((c) => c.status && c.status !== 'running').length;
-  const detailed = tests.suite === DETAIL_SUITE;
+  // Einzeltest-Show NUR beim echten Pipeline-Gate (source=gate, int-regression).
+  // Der Stabilitäts-Check ist Hintergrund-Monitoring — immer ruhige Kompaktzeile.
+  const detailed = tests.suite === DETAIL_SUITE && tests.source === 'gate';
 
   if (detailed) {
-    // Volle Einzeltest-Liste (nur int-regression)
-    if (tests.source === 'stability') {
-      el.testTitle.textContent = '🔍 Stabilitäts-Check';
-    } else {
-      const suite = SUITE_LABEL[tests.suite] || tests.suite;
-      const env = tests.env ? tests.env.toUpperCase() : '—';
-      el.testTitle.textContent = `🛡 Quality Gate: ${suite} gegen ${env}`;
-    }
+    const suite = SUITE_LABEL[tests.suite] || tests.suite;
+    const env = tests.env ? tests.env.toUpperCase() : '—';
+    el.testTitle.textContent = `🛡 Quality Gate: ${suite} gegen ${env}`;
     el.testProgress.textContent = `${done}/${total}`;
     el.testCompact.hidden = true;
     renderTestList(cases);
   } else {
-    // Kompaktzeile statt Einzeltests (abnahme / smoke / quarantine)
-    el.testTitle.textContent = tests.source === 'stability' ? '🔍 Stabilitäts-Check' : '🛡 Quality Gate';
+    // Kompaktzeile (Stabilitäts-Check jeder Suite; Gate: abnahme/smoke/quarantine)
+    el.testTitle.textContent =
+      tests.source === 'stability' ? '🔍 Stabilitäts-Check' : '🛡 Quality Gate';
     el.testProgress.textContent = '';
     el.testList.textContent = '';
     renderTestCompact(tests);
@@ -565,10 +563,17 @@ function renderRegistry(state) {
   const topVersion = images[0]?.version ?? null;
   const isNewTop = lastRegistryTop !== null && topVersion !== null && topVersion !== lastRegistryTop;
 
+  // „LATEST ✓"-Band auf der NEUESTEN promoteten Karte (Position im Stapel egal, da
+  // images[] bereits neueste-zuerst sortiert ist → erster Treffer = neueste). „NEU"
+  // dezent auf noch nicht promoteten Karten.
+  const latestPromotedIdx = images.findIndex((im) => im?.promoted === true);
+
   for (let i = 0; i < GHCR_SLOTS; i++) {
     const card = document.getElementById(`ghcr-card-${i}`);
     if (!card) continue;
     fillGhcrCard(card, images[i], environments);
+    card.classList.toggle('is-latest', i === latestPromotedIdx);
+    card.classList.toggle('is-neu', !!images[i]?.version && images[i]?.promoted !== true);
   }
 
   // Stapel-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
@@ -583,6 +588,31 @@ function renderRegistry(state) {
     }
   }
   lastRegistryTop = topVersion;
+
+  renderGhcrGhost(state, images);
+}
+
+/**
+ * Geister-Karte über der Stapel-Spitze: sichtbar, solange die CI-Stage läuft UND
+ * die gerade gebaute Version (github.run.version) noch nicht im Stapel steht.
+ * Sobald sie in images[0] auftaucht, verschwindet der Geist und die reguläre
+ * Enter-Animation der echten Karte übernimmt.
+ */
+function renderGhcrGhost(state, images) {
+  const ghost = document.getElementById('ghcr-ghost');
+  if (!ghost) return;
+  const stages = Array.isArray(state.github?.stages) ? state.github.stages : [];
+  const ciRunning = stages.find((s) => s.key === 'ci')?.status === 'running';
+  const runVersion = state.github?.run?.version ?? null;
+  const known = images.some((im) => im?.version === runVersion);
+  const building = ciRunning && !!runVersion && !known;
+
+  ghost.classList.toggle('visible', building);
+  if (building) {
+    const txt = ghost.querySelector('.ghcr-ghost-txt');
+    const label = `v${runVersion} · wird gebaut…`;
+    if (txt.textContent !== label) txt.textContent = label;
+  }
 }
 
 /** Füllt eine einzelne Stapel-Karte (oder markiert sie als leer/gestrichelt). */
@@ -625,6 +655,81 @@ function fillGhcrCard(card, img, environments) {
       chips.appendChild(g);
     });
   }
+}
+
+// --------------------------------------------------------------------------
+// BACKUP — DUMP-STAPEL (analog zum GHCR-Stapel)
+// --------------------------------------------------------------------------
+const BACKUP_SLOTS = 3;
+/** Zuletzt gerenderte Dump-Stapel-Spitze — Wechsel löst die Slide-Animation aus. */
+let lastBackupTop = null;
+
+/**
+ * Rendert den Dump-Stapel (max. 3 Karten, oben = neueste).
+ * Quelle: state.backups.dumps. Je Karte: Env-Chip, Uhrzeit (fmtTime), Größe (kB).
+ * Neue oberste Karte gleitet ein, die übrigen rücken nach (GHCR-Keyframes wiederverwendet).
+ * Bei aktivem *-restore-Flow glüht die Spitze (backup-card-0) rot (§3).
+ */
+function renderBackups(state) {
+  const dumps = Array.isArray(state.backups?.dumps) ? state.backups.dumps.slice(0, BACKUP_SLOTS) : [];
+  const top = dumps[0] ? `${dumps[0].env}|${dumps[0].at}` : null;
+  const isNewTop = lastBackupTop !== null && top !== null && top !== lastBackupTop;
+
+  for (let i = 0; i < BACKUP_SLOTS; i++) {
+    const card = document.getElementById(`backup-card-${i}`);
+    if (!card) continue;
+    fillBackupCard(card, dumps[i]);
+  }
+
+  // Slide-Animation nur bei echtem Wechsel der Spitze (nicht beim Erst-Anstrich)
+  if (isNewTop && !prefersReducedMotion.matches) {
+    for (let i = 0; i < BACKUP_SLOTS; i++) {
+      const card = document.getElementById(`backup-card-${i}`);
+      if (!card || card.classList.contains('empty')) continue;
+      const cls = i === 0 ? 'card-enter' : 'card-shift';
+      card.classList.remove('card-enter', 'card-shift');
+      void card.getBoundingClientRect(); // Reflow erzwingen → Keyframe neu starten
+      card.classList.add(cls);
+    }
+  }
+  lastBackupTop = top;
+
+  // Stapel-Spitze glüht rot, solange eine Wiederherstellung läuft (§3, analog rollback-pull)
+  const flows = new Set(state.choreography?.flows || []);
+  const restoreActive = [...flows].some((f) => f.endsWith('-restore'));
+  const topCard = document.getElementById('backup-card-0');
+  if (topCard) topCard.classList.toggle('glow', restoreActive);
+}
+
+/** Füllt eine einzelne Dump-Karte (oder markiert sie als leer/gestrichelt). */
+function fillBackupCard(card, dump) {
+  const chip = card.querySelector('.backup-chip');
+  const chipTxt = card.querySelector('.backup-chip-txt');
+  const timeTxt = card.querySelector('.backup-time');
+  const sizeTxt = card.querySelector('.backup-size');
+
+  if (!dump || !dump.env) {
+    card.classList.add('empty');
+    if (chip.getAttribute('class') !== 'backup-chip') chip.setAttribute('class', 'backup-chip');
+    if (chipTxt.textContent !== '') chipTxt.textContent = '';
+    if (timeTxt.textContent !== '') timeTxt.textContent = '';
+    if (sizeTxt.textContent !== '') sizeTxt.textContent = '';
+    card.dataset.key = '';
+    return;
+  }
+
+  card.classList.remove('empty');
+  const key = `${dump.env}|${dump.at}|${dump.sizeBytes}`;
+  if (card.dataset.key === key) return; // idempotent — nichts geändert
+  card.dataset.key = key;
+
+  chip.setAttribute('class', `backup-chip chip-${dump.env}`);
+  chipTxt.textContent = ENV_CHIP[dump.env] || String(dump.env).toUpperCase();
+
+  timeTxt.textContent = fmtTime(dump.at);
+
+  const kb = Math.round((dump.sizeBytes || 0) / 1024);
+  sizeTxt.textContent = `${kb.toLocaleString('de-DE')} kB`;
 }
 
 // --------------------------------------------------------------------------
@@ -832,6 +937,7 @@ function applyState(state) {
   renderTests(state.tests || {});
   renderMap(state);
   renderRegistry(state);
+  renderBackups(state);
   renderTicker(state.ticker);
   renderControls(state.github);
 }

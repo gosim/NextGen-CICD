@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
+import { BackupsPoller } from './pollers/backups.js';
 import { EnvPoller } from './pollers/envs.js';
 import { GithubPoller } from './pollers/github.js';
 import { OpsDbPoller } from './pollers/opsdb.js';
@@ -18,9 +19,11 @@ function main(): void {
   const github = new GithubPoller(config, state);
   const envs = new EnvPoller(config, state);
   const opsdb = new OpsDbPoller(config, state);
+  const backups = new BackupsPoller(config, state);
   github.start();
   envs.start();
   opsdb.start();
+  backups.start();
 
   const server = app.listen(config.port, () => {
     console.log(
@@ -37,6 +40,7 @@ function main(): void {
     console.log(`${signal} empfangen — fahre herunter …`);
     github.stop();
     envs.stop();
+    backups.stop();
     state.stop();
     server.close(() => {
       void opsdb.stop().finally(() => {

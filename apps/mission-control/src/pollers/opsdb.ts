@@ -44,6 +44,10 @@ type RegistryRow = {
   image_tag: string;
 };
 
+type PromotedRow = {
+  version: string;
+};
+
 interface TickerEntry {
   at: number;
   item: TickerItem;
@@ -91,7 +95,7 @@ export class OpsDbPoller {
     if (this.running) return;
     this.running = true;
     try {
-      const [deployments, testRuns, registry] = await Promise.all([
+      const [deployments, testRuns, registry, promoted] = await Promise.all([
         this.pool.query<DeploymentRow>(
           'SELECT time, env, image_tag, status, version FROM deployments ORDER BY time DESC LIMIT 10',
         ),
@@ -110,9 +114,15 @@ export class OpsDbPoller {
            ORDER BY time DESC
            LIMIT 3`,
         ),
+        // Menge aller promoteten Versionen (mind. ein Gate bestanden) — je Image
+        // wird promoted=true gesetzt, wenn seine Version hier vorkommt.
+        this.pool.query<PromotedRow>(
+          `SELECT DISTINCT version FROM deployments WHERE status = 'promoted' AND version <> ''`,
+        ),
       ]);
+      const promotedVersions = new Set(promoted.rows.map((row) => row.version));
       this.state.setTicker(buildTicker(deployments.rows, testRuns.rows));
-      this.state.setRegistry(buildRegistry(registry.rows));
+      this.state.setRegistry(buildRegistry(registry.rows, promotedVersions));
     } catch (error) {
       // DB weg: letzten Ticker behalten (einfrieren), nicht überschreiben.
       console.warn('Ops-DB-Poll fehlgeschlagen (Ticker eingefroren):', (error as Error).message);
@@ -167,10 +177,11 @@ function testRunText(row: TestRunRow): string {
 }
 
 /** Formt die Registry-Zeilen in den GHCR-Stapel (neueste Version zuerst). */
-export function buildRegistry(rows: RegistryRow[]): RegistryImage[] {
+export function buildRegistry(rows: RegistryRow[], promoted: Set<string>): RegistryImage[] {
   return rows.map((row) => ({
     version: row.version,
     imageTag: row.image_tag ?? '',
+    promoted: promoted.has(row.version),
   }));
 }
 

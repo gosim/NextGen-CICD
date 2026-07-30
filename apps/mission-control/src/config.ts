@@ -17,6 +17,8 @@ export interface Config {
   githubToken: string | null;
   opsDbUrl: string;
   envTargets: EnvTarget[];
+  /** Host-Mount mit den pg_dump-Dateien (read-only), Unterordner je Umgebung. */
+  backupsDir: string;
 }
 
 const DEFAULT_ENV_TARGETS =
@@ -99,5 +101,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
         ? source.OPS_DB_URL.trim()
         : 'postgres://ops:ops@ops-db:5432/ops',
     envTargets: parseEnvTargets(source.ENV_TARGETS),
+    backupsDir:
+      source.BACKUPS_DIR && source.BACKUPS_DIR.trim() !== ''
+        ? source.BACKUPS_DIR.trim()
+        : '/backups',
   };
 }
